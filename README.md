@@ -15,8 +15,6 @@ The two are designed to activate **independently** (each is self-sufficient on i
 
 ## Installation
 
-> This repository is currently private. Automatic discovery via plugin marketplaces or `gh skill` works only on public repositories; while private, install by copying the skill folders into your agent's skills directory.
-
 Each agent looks for skills in its own directory. Copy the desired folder(s) from `skills/` into the right place:
 
 | Agent | Project-level (this workspace) | User-level (all projects) |
