@@ -1,5 +1,14 @@
 # Contributing to xrmghost-skills
 
+Thank you for contributing! Please read this guide before submitting changes.
+
+## Prerequisites
+
+- Git 2.34+
+- A GitHub account with access to the `xrmghost` organisation
+
+---
+
 ## Spec Linting
 
 All pull requests targeting `main` are validated by the `skill-lint` GitHub Actions workflow.
@@ -30,9 +39,75 @@ The CI workflow converts `skill-lint-results.json` into `results.sarif` before u
 - `message.text` contains the human-readable error.
 - `locations[].physicalLocation` points to the affected skill file and line used for inline annotations.
 
-If you want to inspect the SARIF shape locally, use the same workflow in GitHub Actions or reuse the conversion step from `.github/workflows/skill-lint.yml` after generating `skill-lint-results.json`.
-
 ### Where to see results in GitHub
 
 - **Pull request checks:** the required `skill-lint` check shows pass/fail status and inline annotations.
 - **Security tab:** historical SARIF uploads are published under **Security → Code scanning** with category `skill-spec`.
+
+---
+
+## Commit Signing
+
+All commits merged to `main` **must be cryptographically signed**. Branch protection has `required_signatures: true` enabled — unsigned commits will be rejected.
+
+You can sign with either **GPG** or **SSH**. Choose one and configure it once.
+
+### Option A — GPG Signing
+
+```bash
+# 1. Generate key
+gpg --full-generate-key
+
+# 2. Get key ID
+gpg --list-secret-keys --keyid-format=long
+
+# 3. Export and add to GitHub Settings → SSH and GPG keys → New GPG key
+gpg --armor --export <KEY_ID>
+
+# 4. Configure git
+git config --global user.signingkey <KEY_ID>
+git config --global commit.gpgsign true
+git config --global tag.gpgsign true
+
+# 5. Verify
+git log --show-signature -1
+```
+
+### Option B — SSH Signing (Git ≥ 2.34)
+
+```bash
+# 1. Add existing SSH key to GitHub Settings → SSH keys → New SSH key (type: Signing Key)
+
+# 2. Configure git
+git config --global gpg.format ssh
+git config --global user.signingkey ~/.ssh/id_ed25519.pub
+git config --global commit.gpgsign true
+git config --global tag.gpgsign true
+
+# 3. Allowed signers (for local verification)
+echo "your@email.com $(cat ~/.ssh/id_ed25519.pub)" >> ~/.ssh/allowed_signers
+git config --global gpg.ssh.allowedSignersFile ~/.ssh/allowed_signers
+```
+
+### Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---------|-------------|-----|
+| `gpg failed to sign the data` | GPG agent not running | `gpg-agent --daemon` |
+| `secret key not available` | Wrong key ID | Re-run `gpg --list-secret-keys` |
+| GitHub rejects signed commit | Key not added to GitHub | Add public key in GitHub Settings |
+
+---
+
+## Future Work
+
+- **Build provenance attestation** (`attest-build-provenance`) — not yet implemented (no formal releases). Planned for when a release pipeline is added.
+
+---
+
+## Pull Request Guidelines
+
+- Target `main`.
+- One logical change per PR.
+- Ensure all commits in the PR are signed.
+- Reference the relevant ADO work item in the PR description.
