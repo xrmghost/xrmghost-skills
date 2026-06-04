@@ -44,6 +44,8 @@ The skills assume the `xg` CLI is installed and set up. First-time setup — ins
 
 Authoritative reference: **https://docs.xrmghost.tech**. The docs are the source of truth for installation, the full `xg` command reference, and environment/licensing specifics; these skills cover the day-to-day local development loop.
 
+Security disclosures and repository security scope are documented in the [Security Policy](SECURITY.md).
+
 ## License
 
 See [LICENSE](LICENSE).
