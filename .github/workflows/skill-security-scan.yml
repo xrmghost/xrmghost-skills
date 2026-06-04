@@ -1,0 +1,42 @@
+# OWASP Top 10 Agentic Applications 2026: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+name: skill-security-scan
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run fallback Trivy scan with SARIF output
+        id: security_scan
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: secret,misconfig
+          format: sarif
+          output: results.sarif
+          severity: CRITICAL
+          exit-code: 1
+
+      - name: Upload SARIF to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+          category: security
+
+      - name: Fail job on critical findings
+        if: steps.security_scan.outcome == 'failure'
+        run: exit 1
