@@ -1,5 +1,7 @@
 # xrmghost-skills
 
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/xrmghost/xrmghost-skills/badge)](https://securityscorecards.dev/viewer/?uri=github.com/xrmghost/xrmghost-skills)
+
 Agent Skills for [XrmGhost](https://docs.xrmghost.tech) — running and debugging Dataverse / Dynamics 365 / Power Platform server-side C# locally with the `xg` CLI, instead of deploying to an online instance and reading trace logs.
 
 These skills are written to the [Agent Skills](https://agentskills.io) open standard (a `SKILL.md` with `name` + `description` frontmatter, plus optional supporting files). They are consumed by AI coding agents — the primary way XrmGhost is used in practice is through an agent writing and verifying plugin / Custom API code, not by hand.

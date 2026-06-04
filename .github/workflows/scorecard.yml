@@ -1,0 +1,53 @@
+name: OpenSSF Scorecard
+
+on:
+  schedule:
+    # Weekly on Monday at 06:15 UTC
+    - cron: '15 6 * * 1'
+  push:
+    branches:
+      - main
+  branch_protection_rule:
+
+permissions: read-all
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      # Required to upload SARIF results to code-scanning dashboard
+      security-events: write
+      # Required to publish results and open issues as requested
+      id-token: write
+      # Only need to read repo contents
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run analysis
+        uses: ossf/scorecard-action@v2.4.0
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # Publish results to OpenSSF REST API for public repositories.
+          # See https://github.com/ossf/scorecard-action#publishing-results
+          publish_results: true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SARIF file
+          path: results.sarif
+          retention-days: 5
+
+      - name: Upload to code-scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+          category: supply-chain
