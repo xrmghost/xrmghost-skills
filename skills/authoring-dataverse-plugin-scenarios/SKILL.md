@@ -1,6 +1,6 @@
 ---
 name: authoring-dataverse-plugin-scenarios
-description: Write the JSON scenario files that XrmGhost uses to run Dataverse / Dynamics 365 / Power Platform server-side C# locally — describing the operation to execute: the message, the input data, the backing data a query or retrieve will see, and the expected outcome. Although named for plugins — the most common case — this covers Custom APIs and other C# pipeline objects too. Use this skill when preparing the input for a local run: defining what operation to execute, supplying the data the code will read, or describing what should happen when it runs. Part of the XrmGhost toolset.
+description: "Write the JSON scenario files that XrmGhost uses to run Dataverse / Dynamics 365 / Power Platform server-side C# locally — describing the operation to execute: the message, the input data, the backing data a query or retrieve will see, and the expected outcome. Although named for plugins — the most common case — this covers Custom APIs and other C# pipeline objects too. Use this skill when preparing the input for a local run: defining what operation to execute, supplying the data the code will read, or describing what should happen when it runs. Part of the XrmGhost toolset."
 ---
 
 # Authoring Dataverse Plugin Scenarios
