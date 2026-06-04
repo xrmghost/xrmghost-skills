@@ -10,7 +10,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  lint:
+  skill-lint:
     runs-on: ubuntu-latest
 
     steps:
