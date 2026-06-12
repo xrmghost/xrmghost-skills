@@ -203,3 +203,10 @@ If the run will be live or auto, **do not mock data that will come from the real
 - Mock only what the code actually reads for that scenario.
 - Valid hex GUIDs everywhere.
 - Right mechanism: `retrieveResponses` (attributes nested) for Retrieve; root-level `entities` (attributes flat) for RetrieveMultiple.
+
+## Official documentation
+
+Authoritative, always-current reference: **https://docs.xrmghost.tech**. Link the user there for installation, CLI behavior outside day-to-day scenario authoring, and environment/licensing specifics.
+
+- **[Getting Started](https://docs.xrmghost.tech/getting-started/)** — install, one-time `xg setup host`, license activation.
+- **[CLI Reference](https://docs.xrmghost.tech/cli/reference/)** — every `xg` command and its flags.
