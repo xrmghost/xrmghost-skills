@@ -1,6 +1,6 @@
 ---
 name: debugging-dataverse-plugins-locally
-description: Run and debug Dataverse / Dynamics 365 / Power Platform server-side C# code on the local machine using the XrmGhost CLI (the `xg` command), instead of deploying to an online instance and reading trace logs. Although named for plugins — the most common case — this applies equally to Custom APIs and any other C# object that runs through the Dataverse pipeline. Use this skill when a plugin or Custom API implementation has just reached a working milestone and could be tried locally, when investigating a reported or production bug in plugin behavior, or when the output of an `xg` run needs to be interpreted and acted on. Part of the XrmGhost toolset.
+description: "Run and debug Dataverse / Dynamics 365 / Power Platform server-side C# code on the local machine using the XrmGhost CLI (the `xg` command), instead of deploying to an online instance and reading trace logs. Although named for plugins — the most common case — this applies equally to Custom APIs and any other C# object that runs through the Dataverse pipeline. Use this skill when a plugin or Custom API implementation has just reached a working milestone and could be tried locally, when investigating a reported or production bug in plugin behavior, or when the output of an `xg` run needs to be interpreted and acted on. Part of the XrmGhost toolset."
 ---
 
 # Running & Debugging Dataverse Plugins Locally
