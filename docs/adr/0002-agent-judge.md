@@ -129,3 +129,4 @@ Soglia di confidenza minima accettabile per suggerimenti forti: **0.85**. Sotto 
 - Qodo pricing: https://www.qodo.ai/pricing/
 - Greptile pricing: https://www.greptile.com/pricing
 - OpenAI API pricing: https://openai.com/api/pricing/
+- Architettura di prodotto XrmGhost con cui questa raccomandazione (giudizio solo consultivo, mai gate) deve restare coerente: https://docs.xrmghost.tech/architecture/

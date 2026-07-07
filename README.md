@@ -4,6 +4,8 @@
 
 Agent Skills for [XrmGhost](https://docs.xrmghost.tech) — running and debugging Dataverse / Dynamics 365 / Power Platform server-side C# locally with the `xg` CLI, instead of deploying to an online instance and reading trace logs. Start with the product docs at **https://docs.xrmghost.tech** for setup, CLI reference, and licensing details.
 
+If you landed here to understand how these two skills fit into the wider product rather than to read their source, the dedicated docs section is a better starting point than this README: **[docs.xrmghost.tech/skills/](https://docs.xrmghost.tech/skills/)** covers what the skills are for and when they activate, **[installing-skills/](https://docs.xrmghost.tech/skills/installing-skills/)** walks through setup per agent, and **[using-skills/](https://docs.xrmghost.tech/skills/using-skills/)** shows the day-to-day authoring/debugging loop end to end.
+
 These skills are written to the [Agent Skills](https://agentskills.io) open standard (a `SKILL.md` with `name` + `description` frontmatter, plus optional supporting files). They are consumed by AI coding agents — the primary way XrmGhost is used in practice is through an agent writing and verifying plugin / Custom API code, not by hand.
 
 ## Skills in this repository
@@ -44,7 +46,11 @@ The skills assume the `xg` CLI is installed and set up. First-time setup — ins
 
 ## Documentation
 
-Authoritative reference: **https://docs.xrmghost.tech**. The docs are the source of truth for installation, the full `xg` command reference, environment/licensing specifics, and the broader product documentation; these skills cover the day-to-day local development loop.
+Authoritative reference: **https://docs.xrmghost.tech**. The docs are the source of truth for installation, the full [`xg` command reference](https://docs.xrmghost.tech/cli/reference/), environment/licensing specifics, and the broader product documentation; these skills cover the day-to-day local development loop.
+
+This repository's own architectural rationale — why the linter and the advisory judge were chosen for a public, Markdown-only, single-maintainer repo — lives in [`docs/adr/`](docs/adr/); the product-wide architecture these decisions have to stay consistent with is documented separately at [docs.xrmghost.tech/architecture/](https://docs.xrmghost.tech/architecture/).
+
+Want to change a skill or add a new one? See [CONTRIBUTING.md](CONTRIBUTING.md) for the linting, signing, and PR requirements enforced on this repo.
 
 Security disclosures and repository security scope are documented in the [Security Policy](SECURITY.md).
 

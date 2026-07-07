@@ -1,5 +1,7 @@
 # ADR 0001: Skill linter per xrmghost-skills
 
+> Questa ADR riguarda solo la validazione strutturale del repo (`skills/*/SKILL.md`). Per il contratto architetturale piu ampio con cui la CI deve restare coerente — come le skill si inseriscono nel prodotto XrmGhost — vedi [docs.xrmghost.tech/architecture/](https://docs.xrmghost.tech/architecture/).
+
 ## Contesto
 
 Il repository `xrmghost-skills` contiene skill Markdown-only pubblicate su GitHub. Serve un validatore OSS per `skills/*/SKILL.md` che:

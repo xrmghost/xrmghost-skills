@@ -1,5 +1,7 @@
 # Security Policy
 
+This policy covers the `xrmghost-skills` repository only — the Markdown skill content and its CI. It is not the place to report issues with the `xg` CLI, the AKMS licensing backend, or the Dataverse plugins these skills drive; those live in their own repos and are out of scope here. Product-level license tiers referenced below (`mock` / `auto` / `live` data sources, Pro license) are defined authoritatively at [docs.xrmghost.tech/editions/](https://docs.xrmghost.tech/editions/), not by this file.
+
 ## Capability Profile
 
 - The skills in this repository guide agents to use the XrmGhost CLI through the `xg` command.
