@@ -2,6 +2,8 @@
 
 Thank you for contributing! Please read this guide before submitting changes.
 
+Before touching `skills/*/SKILL.md`, it helps to know what these skills are actually standing in for. They encode the local `xg run` authoring/debugging loop described at **[docs.xrmghost.tech/skills/using-skills/](https://docs.xrmghost.tech/skills/using-skills/)**, against the command surface documented in the **[CLI reference](https://docs.xrmghost.tech/cli/reference/)** — a change here that drifts from either is a behavior bug even if the linter still passes. If your contribution is a product bug or feature idea rather than skill wording, file it against the product itself via **[Report a Bug](https://docs.xrmghost.tech/community/report-a-bug/)** or **[Request a Feature](https://docs.xrmghost.tech/community/request-a-feature/)** instead of a PR here.
+
 ## Prerequisites
 
 - Git 2.34+
