@@ -54,6 +54,14 @@ Want to change a skill or add a new one? See [CONTRIBUTING.md](CONTRIBUTING.md) 
 
 Security disclosures and repository security scope are documented in the [Security Policy](SECURITY.md).
 
+## Related resources
+
+- **[www.xrmghost.tech](https://www.xrmghost.tech)** — the product marketing site: what XrmGhost is, who it's for, and how to get started, if you haven't decided yet whether it fits your workflow.
+- **[github.com/xrmghost/xrmghost](https://github.com/xrmghost/xrmghost)** — the base repository and index for the wider XrmGhost suite, useful if you want the map of every repo before drilling into this one.
+- **[github.com/xrmghost/xrmghost-docs](https://github.com/xrmghost/xrmghost-docs)** — source of the docs site referenced throughout this README, for anyone who wants to read or contribute to the documentation itself rather than just consume it.
+- **[github.com/xrmghost/xrmghost-attributes](https://github.com/xrmghost/xrmghost-attributes)** — a sibling library repo with strongly-typed attribute helpers for Dataverse plugin code, often written alongside the scenarios and runs these skills drive.
+- **[XrmGhost.Attributes on NuGet](https://www.nuget.org/packages/XrmGhost.Attributes)** — the packaged distribution of that library, for pulling it directly into a plugin project instead of building from source.
+
 ## License
 
 See [LICENSE](LICENSE).
