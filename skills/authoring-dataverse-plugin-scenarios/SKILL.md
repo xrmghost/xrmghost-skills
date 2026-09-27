@@ -62,8 +62,16 @@ Inside any `attributes` object, value typing must be explicit or the framework m
 
 What you expect when the operation runs:
 
-- **Expect success**: omit `expectedException`. A run that does not throw is the success.
-- **Expect rejection**: declare `expectedException` with a type and a substring of the message. The run matches only if that exception is thrown.
+- **Expect success**: omit `expectedException`. A run that completes without throwing is the success.
+- **Expect rejection**: declare `expectedException` with a `typeName`. The run is the success only if an exception satisfying it is thrown — and an `expectedException` that is declared but never raised during the run is a **RED** outcome, not a green one: a rejection scenario fails when the rejection does not happen.
+
+### How `expectedException` is matched
+
+- **`typeName` is required.** It is the **fully qualified** type name — namespace included — and it is compared **exactly**: a simple name such as `InvalidPluginExecutionException` does not match, and neither does a derived type that would be assignable to the declared one. An empty `typeName` is not a wildcard: it matches nothing, so a scenario that leaves it empty can never pass.
+- **The comparison is applied to every link of the exception chain**, walked from the outermost exception inward through each `InnerException`. One link satisfying the expectation is enough.
+- **`messageContains` is optional.** When present it is a substring of the exception message, and it is checked on the **same link that satisfied the type** — not on another link, and not on the chain as a whole. Omit it when the type alone is what you mean to assert.
+
+When the plugin wraps an internal failure — `throw new InvalidPluginExecutionException("...", inner)` — declare the type **Dataverse shows the caller**, which is the wrapper (`Microsoft.Xrm.Sdk.InvalidPluginExecutionException`), not the inner type. The inner type would also be found, since the chain is walked, but asserting it pins an implementation detail instead of the contract the caller sees.
 
 ```json
 {
@@ -87,6 +95,14 @@ What you expect when the operation runs:
     "typeName": "Microsoft.Xrm.Sdk.InvalidPluginExecutionException",
     "messageContains": "Parent account is required."
   }
+}
+```
+
+Dropping `messageContains` asserts the rejection type and nothing about its wording — useful when the message is not part of what you are pinning down:
+
+```json
+"expectedException": {
+  "typeName": "Microsoft.Xrm.Sdk.InvalidPluginExecutionException"
 }
 ```
 
