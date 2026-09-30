@@ -10,6 +10,7 @@
   },
   "homepage": "https://docs.xrmghost.tech/skills/",
   "repository": "https://github.com/xrmghost/xrmghost-skills",
+  "license": "MIT",
   "keywords": [
     "dataverse",
     "dynamics-365",

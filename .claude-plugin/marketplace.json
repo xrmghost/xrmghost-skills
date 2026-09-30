@@ -11,6 +11,7 @@
       "name": "xrmghost",
       "source": "./",
       "description": "Run and debug Dataverse / Dynamics 365 / Power Platform server-side C# (plugins, Custom APIs) locally with the XrmGhost CLI, instead of deploying to an online instance and reading trace logs.",
+      "license": "MIT",
       "category": "development-testing",
       "tags": [
         "dataverse",
