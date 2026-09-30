@@ -40,6 +40,15 @@ Copy the whole skill folder, including its `references/` subdirectory — suppor
 
 A guided multi-agent installer (auto-detect installed agents, choose project vs user scope) is planned.
 
+### Claude Code plugin marketplace
+
+This repository is also a self-hosted [Claude Code plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces) (`.claude-plugin/marketplace.json`), so Claude Code users can install both skills as one plugin instead of copying files:
+
+```bash
+claude plugin marketplace add xrmghost/xrmghost-skills
+claude plugin install xrmghost@xrmghost
+```
+
 ## Prerequisites
 
 The skills assume the `xg` CLI is installed and set up. First-time setup — installing `xg`, `xg setup host`, and license activation — is covered by the [official Getting Started](https://docs.xrmghost.tech/getting-started/). XrmGhost is distributed for evaluation; runs stop working as expected once the trial period lapses.
