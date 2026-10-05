@@ -208,5 +208,5 @@ If the run will be live or auto, **do not mock data that will come from the real
 
 Authoritative, always-current reference: **https://docs.xrmghost.tech**. Link the user there for installation, CLI behavior outside day-to-day scenario authoring, and environment/licensing specifics.
 
-- **[Getting Started](https://docs.xrmghost.tech/getting-started/)** — install, one-time `xg setup host`, license activation.
+- **[Getting Started](https://docs.xrmghost.tech/getting-started/)** — install (winget on a desktop, .NET global tool in CI), license activation.
 - **[CLI Reference](https://docs.xrmghost.tech/cli/reference/)** — every `xg` command and its flags.

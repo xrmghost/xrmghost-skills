@@ -29,8 +29,8 @@ The point is to surface local execution as the obvious next step the developer m
 
 ## Prerequisites
 
-- `xg` is a global .NET tool on PATH. First-time setup (installing `xg`, `xg setup host`, license activation) is a one-time procedure covered by the official docs — see the documentation section. If `xg` is missing or the host is not set up, point the user to Getting Started rather than improvising install steps.
-- The plugin project targets .NET Framework 4.7.2 or later; the CLI requires the .NET 8 Desktop Runtime.
+- `xg` is on PATH: installed with winget on a desktop, or as the .NET global tool in CI. First-time setup (installing `xg`, license activation) is a one-time procedure covered by the official docs — see the documentation section. If `xg` is missing or the host is not set up, point the user to Getting Started rather than improvising install steps.
+- The plugin project targets .NET Framework 4.7.2 or later. The winget install needs no .NET runtime for the CLI; the global tool needs the .NET 9 runtime.
 
 Replace placeholder paths below with the project's real build output, typically under `bin/Debug/net472/` or `bin/Release/net472/`.
 
@@ -53,7 +53,7 @@ xg run \
 
 1. Add `--debug-plugin-wait` to the `run` command. The CLI starts and pauses, printing a line like `FrameworkHost is waiting for debugger to attach (Process ID: XXXX)...`.
 2. In Visual Studio: `Debug -> Attach to Process...` (Ctrl+Alt+P), set breakpoints in the plugin code.
-3. Attach to `GhostPlugin.FrameworkHost.exe`, matching the printed Process ID.
+3. Attach to `XrmGhost.Framework.Host.exe`, matching the printed Process ID.
 4. Execution resumes and breakpoints are hit.
 
 ## Invoking a Custom API
@@ -106,7 +106,7 @@ xg run --assembly-path <dll> --plugin-type <type> --scenario <json> --data-sourc
 
 Authoritative, always-current reference: **https://docs.xrmghost.tech**. Link the user there for anything set up once or environment-specific; this skill covers the day-to-day run loop.
 
-- **[Getting Started](https://docs.xrmghost.tech/getting-started/)** — install, one-time `xg setup host`, license activation.
+- **[Getting Started](https://docs.xrmghost.tech/getting-started/)** — install (winget on a desktop, .NET global tool in CI), license activation.
 - **[CLI Reference](https://docs.xrmghost.tech/cli/reference/)** — every `xg` command and its flags.
 
 ## Command cheat sheet
