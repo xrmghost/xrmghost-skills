@@ -51,7 +51,7 @@ claude plugin install xrmghost@xrmghost
 
 ## Prerequisites
 
-The skills assume the `xg` CLI is installed and set up. First-time setup — installing `xg`, `xg setup host`, and license activation — is covered by the [official Getting Started](https://docs.xrmghost.tech/getting-started/). XrmGhost is distributed for evaluation; runs stop working as expected once the trial period lapses.
+The skills assume the `xg` CLI is installed. First-time setup — installing `xg` with `winget install XrmGhost.Cli` (the runtime host comes with it) and license activation — is covered by the [official Getting Started](https://docs.xrmghost.tech/getting-started/). XrmGhost is distributed for evaluation; runs stop working as expected once the trial period lapses.
 
 ## Documentation
 
