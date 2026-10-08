@@ -53,10 +53,14 @@ Authoring failure scenarios is a *discovery* tool: forcing yourself to ask "what
 
 Inside any `attributes` object, value typing must be explicit or the framework misreads it. This is the single most common source of authoring errors:
 
-- **Plain values** (string, number, bool): written directly — `"name": "Contoso Ltd"`, `"revenue": 1000000`.
-- **OptionSet / Picklist**: `{ "value": X }` — never the bare number.
-- **EntityReference / lookup**: `{ "logicalName": "...", "id": "...", "name": "..." }` (`name` optional).
-- **GUIDs must be valid hex.** IDs with non-hex characters fail to parse inside EntityReference objects. Use real GUIDs for test records.
+| Type | Write it as | Notes |
+|------|-------------|-------|
+| Plain value (string, number, bool) | `"name": "Contoso Ltd"`, `"numberofemployees": 250`, `"donotemail": true` | A bare number arrives as a plain number, never as `Money` (`100` in `Target.attributes` was observed as `System.Int32`). |
+| OptionSet / Picklist | `{ "value": X }` | Never the bare number. |
+| EntityReference / lookup | `{ "logicalName": "...", "id": "...", "name": "..." }` | `name` optional. GUIDs must be valid hex — IDs with non-hex characters fail to parse. Use real GUIDs for test records. |
+| Money | **No working form — known limit** | Probed with released `xg` (CLI 1.7.5, host 1.0.2) in `Target.attributes`, `retrieveResponses`, root-level `entities` and `preEntityImages`: no context delivered a `Microsoft.Xrm.Sdk.Money`. `{ "value": 100 }` arrives as an `OptionSetValue` in all four; `{ "value": 100.50 }` and `{ "value": 100.0 }` are rejected while the scenario is parsed (`Target.attributes`, `retrieveResponses`), fail the run with a `System.FormatException` (`preEntityImages`), or silently drop the record (root-level `entities`). |
+
+**Money is not supported by scenarios today.** Do not write `{ "value": N }` — or any other shape — expecting the plugin to read a `Money`: the probe above found none, in any of the four contexts. A plugin path that reads a Money attribute cannot be driven green by a scenario yet; say so to the user instead of inventing a form, and keep the Money-reading logic covered by a pure-logic unit test until the follow-up bug on XrmGhost Core is fixed.
 
 ## Describing the expected outcome
 
@@ -174,11 +178,94 @@ For a plugin registered with a pre-image, provide a **root-level** `preEntityIma
 - The key (`"PreImage"`) must match the image name registered on the step and read via `Context.PreEntityImages["PreImage"]`.
 - Attribute format matches `inputParameters.Target.attributes`: `{ "value": X }` for OptionSets, `{ "logicalName": "...", "id": "..." }` for EntityReferences.
 
+## New Custom API or webhook wiring: a pair of xg scenarios
+
+When the code adds or changes **wiring** — a Custom API, or a plugin that receives a webhook and calls another API through `IOrganizationService.Execute` — author **a pair of xg scenarios** for it, even when xUnit + Moq tests already cover the logic:
+
+- **The call path** — the input that makes the code call out.
+- **The skip path** — the input that makes the code decide *not* to call out, ending clean.
+
+The pair is what proves the wiring: message name, parameters, branching. The rule against mocks is narrow: do not write a **new mock of `IOrganizationService`** to stand in for these scenarios. xUnit + Moq tests of **pure logic** (parsing, mapping, decisions that never touch the service) stay legitimate and are not replaced by the pair.
+
+### One plugin per run, and the `Execute` boundary
+
+`xg` runs **exactly one plugin type per run** — the one named by `--plugin-type`. There is no pipeline cascade: when that plugin calls another Custom API through `Execute`, the other API's plugin does not run. The call stops at the host's `Execute` boundary instead, which handles only:
+
+- `RetrieveRequest` — on every license;
+- the metadata requests `RetrieveEntityRequest`, `RetrieveAllEntitiesRequest`, `RetrieveAttributeRequest` and `RetrieveRelationshipRequest` — **Pro**: without a Pro license they throw `ProFeatureNotLicensedException`, which `expectedException` can never catch.
+
+**Every other request** throws `System.NotImplementedException` with this message, where `{RequestName}` is the request's name:
+
+```text
+FrameworkOrganizationServiceAdapter.Execute for request type {RequestName} is not yet implemented.
+```
+
+So the call path of a wiring scenario ends at that boundary. Deduce it **before the first run**, from the code: the request is not in the list above, so the scenario declares the boundary exception up front. Declare it exactly:
+
+- `typeName`: `System.NotImplementedException`, fully qualified.
+- `messageContains`: the full sentence above with the real `{RequestName}`. The `{RequestName}` is the string **the plugin code passes** — the argument of `new OrganizationRequest("...")`, or the `RequestName` of the early-bound request class — **without** the `custom_` prefix. The `custom_` prefix belongs only to a scenario's `messageName`.
+
+Two consequences to state to the user:
+
+- **The code after `Execute` is not covered.** Whatever the plugin does with the response — tracing, output parameters, follow-up writes — never runs in the call path. Cover it with a pure-logic test or on a real environment.
+- **The test depends on the host's message text.** If a future host release rewords the message, `messageContains` stops matching and the call path turns red. Re-check the wording against the released host rather than loosening the assertion.
+
+### Example: `custom_contoso_ProcessWebhook` calling `contoso_SendNotification`
+
+The plugin behind the `custom_contoso_ProcessWebhook` Custom API reads `EventType` and `Payload`. For `EventType = "notification"` it calls the `contoso_SendNotification` Custom API with `service.Execute(new OrganizationRequest("contoso_SendNotification") { ["Message"] = payload })`; for any other event it traces and returns, setting `Handled = false`.
+
+Call path — the run is green only because the declared boundary exception is raised, with the exact `RequestName`:
+
+```json
+{
+  "scenarioName": "Custom API - webhook notification reaches contoso_SendNotification",
+  "pluginAssemblyName": "Contoso.Plugins.dll",
+  "pluginTypeName": "Contoso.Plugins.Webhooks.ProcessWebhook",
+  "executionContext": {
+    "messageName": "custom_contoso_ProcessWebhook",
+    "primaryEntityName": "",
+    "stage": 30,
+    "mode": 0,
+    "inputParameters": {
+      "EventType": "notification",
+      "Payload": "Order 1001 shipped"
+    }
+  },
+  "expectedException": {
+    "typeName": "System.NotImplementedException",
+    "messageContains": "FrameworkOrganizationServiceAdapter.Execute for request type contoso_SendNotification is not yet implemented."
+  }
+}
+```
+
+Skip path — no `expectedException`; the run must end clean:
+
+```json
+{
+  "scenarioName": "Custom API - webhook event without notification is skipped",
+  "pluginAssemblyName": "Contoso.Plugins.dll",
+  "pluginTypeName": "Contoso.Plugins.Webhooks.ProcessWebhook",
+  "executionContext": {
+    "messageName": "custom_contoso_ProcessWebhook",
+    "primaryEntityName": "",
+    "stage": 30,
+    "mode": 0,
+    "inputParameters": {
+      "EventType": "heartbeat",
+      "Payload": "ping"
+    }
+  }
+}
+```
+
+Keep the two scenarios distinct. A call path that turns green on a **different** `RequestName`, or a skip path that hits `Execute` at all, means the code calls something you did not declare — that is a finding, not a pass.
+
 ## Custom API scenarios: the parameters
 
 A Custom API scenario differs from an entity plugin in how its **input parameters** are written:
 
 - **Message name**: `custom_<publisherprefix>_<ApiName>`, e.g. `custom_contoso_EvaluateMembership` — the `custom_` segment and the publisher prefix are both required.
+- **Request name is not the message name.** When the code calls another Custom API through `Execute`, the `{RequestName}` asserted in `messageContains` is the name the code passes (`contoso_SendNotification`), never the scenario form `custom_contoso_SendNotification` — see the `Execute` boundary above.
 - **No `Target`**: each declared request parameter is a **direct key** under `inputParameters`, not wrapped in a `Target`.
 - **Primary entity**: empty string `""` or omitted — Custom APIs are global, not bound to a record.
 - **Supported input types**: String, Integer (`42`), Boolean (`true`), Decimal (`12.5`), Guid (as a hex string), DateTime (ISO 8601 string).
