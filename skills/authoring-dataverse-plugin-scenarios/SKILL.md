@@ -54,16 +54,19 @@ Authoring failure scenarios is a *discovery* tool: forcing yourself to ask "what
 Inside any `attributes` object, value typing must be explicit or the framework misreads it. This is the single most common source of authoring errors:
 
 - **Plain values** (string, number, bool): written directly — `"name": "Contoso Ltd"`, `"revenue": 1000000`.
-- **OptionSet / Picklist**: `{ "value": X }` — never the bare number.
+- **OptionSet / Picklist**: `{ "value": X }` — never the bare number. The discriminator may also be written explicitly as `{ "type": "OptionSetValue", "value": X }`; both forms mean OptionSetValue, and the untagged `{ "value": X }` stays OptionSetValue.
+- **Money / currency**: `{ "type": "Money", "value": X }` — the `type` tag is what makes it Money; without it the object is read as an OptionSetValue.
 - **EntityReference / lookup**: `{ "logicalName": "...", "id": "...", "name": "..." }` (`name` optional).
 - **GUIDs must be valid hex.** IDs with non-hex characters fail to parse inside EntityReference objects. Use real GUIDs for test records.
+
+> **Requires XrmGhost 1.7.6 or later.** The tagged Money form, the explicit OptionSetValue tag, and every Retrieve behavior described under *Supplying data the code reads* (Retrieve reading the `entities` seed, precedence of in-run mutations, ColumnSet projection, the Dataverse fault instead of `KeyNotFoundException`, a malformed seed failing the run) apply from **1.7.6**. Check the installed version with `xg --version`, or bring the host up to date with `xg setup host --update`. On earlier versions `{ "type": "Money", "value": X }` is read as an OptionSetValue, and Retrieve does not see `entities`.
 
 ## Describing the expected outcome
 
 What you expect when the operation runs:
 
 - **Expect success**: omit `expectedException`. A run that does not throw is the success.
-- **Expect rejection**: declare `expectedException` with a type and a substring of the message. The run matches only if that exception is thrown.
+- **Expect rejection**: declare `expectedException` with a type and a substring of the message. The run matches only if that exception is thrown. `typeName` is compared exactly (case-sensitive) against the full .NET name of the thrown type, so copy it verbatim — see *When the record is not there* for the full name of the Dataverse fault.
 
 ```json
 {
@@ -92,11 +95,14 @@ What you expect when the operation runs:
 
 ## Supplying data the code reads
 
-When the code reads other records while it runs, describe that data. There are two distinct mechanisms — using the wrong one is the second most common mistake.
+When the code reads other records while it runs, describe that data. There are two distinct mechanisms, with **different attribute shapes** — mixing up the shapes is the second most common mistake:
 
-### `Retrieve` (single record) → `organizationServiceMock.retrieveResponses`
+- `organizationServiceMock.retrieveResponses` — the explicit answer to a `Retrieve`; attributes **nested** under `attributes`.
+- Root-level `entities` — the seed of records the run starts with; attributes **flat** on the entity object. `RetrieveMultiple` queries it, and from 1.7.6 `Retrieve` reads it too.
 
-Each entry matches one `Service.Retrieve(entityName, id, ...)` call. Attributes are **nested** under an `attributes` object.
+### `Retrieve` (single record) → `organizationServiceMock.retrieveResponses` or the `entities` seed
+
+Each `retrieveResponses` entry matches one `Service.Retrieve(entityName, id, ...)` call. Attributes are **nested** under an `attributes` object.
 
 ```json
 "organizationServiceMock": {
@@ -112,6 +118,8 @@ Each entry matches one `Service.Retrieve(entityName, id, ...)` call. Attributes 
   ]
 }
 ```
+
+A record that is not in `retrieveResponses` can be supplied through the root-level `entities` seed instead (shape below): `Retrieve` finds it there by logical name and id. The two structures can coexist in the same scenario — `retrieveResponses` stays the explicit answer for a given Retrieve, `entities` the data both Retrieve and RetrieveMultiple can read.
 
 ### `RetrieveMultiple` (query) → root-level `entities`
 
@@ -133,10 +141,42 @@ Rules for `entities`:
 - Root-level — sibling of `executionContext`, never nested inside it.
 - `logicalName` and `id` at the root of each entity object; attributes flat on the object.
 - Include every field the query's filter references, or the record gets filtered out.
-- OptionSet → `{ "value": X }`; EntityReference → `{ "logicalName": "...", "id": "..." }`.
+- OptionSet → `{ "value": X }` (or `{ "type": "OptionSetValue", "value": X }`); Money → `{ "type": "Money", "value": X }`; EntityReference → `{ "logicalName": "...", "id": "..." }`.
 - The CLI applies the QueryExpression itself (logical name, `Equal`/`In` filters, column set, ordering) and returns only matches.
+- `Retrieve` reads the same records (1.7.6+), by logical name and id.
+- A malformed seed entity **fails the run**: the run stops with a message naming `EntitiesJson`, the entity's logical name, its index in the list and, when known, the attribute that could not be converted — it does not continue with zero entities. Fix the named entry rather than looking for the problem in the code.
 
-> Do **not** use the legacy `retrieveMultipleResponses` format (attributes nested inside a `response.entities` array). Use the root-level `entities` structure above. A single scenario may combine `entities` (for RetrieveMultiple) and `retrieveResponses` (for Retrieve).
+> Do **not** use the legacy `retrieveMultipleResponses` format (attributes nested inside a `response.entities` array). Use the root-level `entities` structure above. A single scenario may combine `entities` and `retrieveResponses`.
+
+### Which source a `Retrieve` sees (precedence)
+
+When more than one source holds the same record (logical name + id), `Retrieve` answers from the first one that has it, in this order:
+
+1. **In-run mutations** — what the code itself did earlier in the same run. After an `Update`, the next `Retrieve` of that record sees the updated values; after a `Delete`, the next `Retrieve` of that record is not-found (the fault below), even if `retrieveResponses` or `entities` still describe it.
+2. **`retrieveResponses`** — the explicit answer.
+3. **`entities`** seed.
+
+This consistency covers the next `Retrieve` in the same run only; do not rely on `Update`/`Delete` being reflected anywhere else.
+
+### Which columns a `Retrieve` returns (ColumnSet)
+
+`Retrieve` projects the record onto the `ColumnSet` the code passes, whichever source the record came from:
+
+- **Columns required** (`new ColumnSet("name", "telephone1")`) — only those attributes, the ones the source has.
+- **Empty** (`new ColumnSet()`) — no attributes besides the primary key.
+- **AllColumns** (`new ColumnSet(true)`) — every attribute the source has.
+
+The primary key is always returned. Mock every column the code requests, or it will be absent from the returned entity.
+
+### When the record is not there
+
+A `Retrieve` of a record no source has — or with `Guid.Empty` as id, or after a `Delete` in the same run — raises the Dataverse fault, as Dataverse does: `FaultException<OrganizationServiceFault>` with ErrorCode `0x80040217` (object does not exist). It is **not** a `KeyNotFoundException`. To author a failure path on it, declare exactly:
+
+```json
+"expectedException": {
+  "typeName": "System.ServiceModel.FaultException`1[[Microsoft.Xrm.Sdk.OrganizationServiceFault, Microsoft.Xrm.Sdk, Version=9.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35]]"
+}
+```
 
 ## Pre-entity images (PreImage)
 
@@ -202,7 +242,7 @@ If the run will be live or auto, **do not mock data that will come from the real
 - One scenario per operation; name files by intent (`EnrichContact_HappyPath`, `ValidateContact_MissingParent`).
 - Mock only what the code actually reads for that scenario.
 - Valid hex GUIDs everywhere.
-- Right mechanism: `retrieveResponses` (attributes nested) for Retrieve; root-level `entities` (attributes flat) for RetrieveMultiple.
+- Right shape: `retrieveResponses` (attributes nested) is the explicit answer for Retrieve; root-level `entities` (attributes flat) feeds RetrieveMultiple and, from 1.7.6, Retrieve.
 
 ## Official documentation
 
