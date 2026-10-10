@@ -60,6 +60,13 @@ xg run \
 
 A Custom API runs through the same pipeline but is invoked differently from an entity plugin: it is identified by a message name of the form `custom_<publisherprefix>_<ApiName>` and takes its inputs directly rather than via a `Target`. When running one, that message-name shape is the thing to get right — if the run reports the message is not found, the prefix is the first suspect. (How to *write* the scenario's input parameters belongs to the scenario-authoring skill.)
 
+**xg comes first for new wiring.** When a Custom API or webhook wiring is new or changed, run its pair of xg scenarios — the call path and the skip path, as the authoring skill describes — even if xUnit + Moq tests already exist. Do not replace the pair with a new mock of `IOrganizationService`; pure-logic unit tests stay as they are.
+
+**Reading the `Execute` boundary.** `xg` runs one plugin per run. When the plugin calls another API through `Execute` with a request the host does not handle, the host throws `System.NotImplementedException` (`FrameworkOrganizationServiceAdapter.Execute for request type {RequestName} is not yet implemented.`), and a call-path scenario declares exactly that, with the `RequestName` the code passes. Read the result this way:
+
+- A green call path counts as evidence **only together with a green skip path**. The pair shows that the code reaches the declared request when it should, and stays clear of `Execute` when it should not. A green call path on its own proves only that *something* threw.
+- An **unexpected request** — a `RequestName` other than the declared one, a `NotImplementedException` in a scenario that declared none, or a skip path that reaches `Execute` — is a finding. Report it through the post-run protocol below. Do not fix it by editing the scenario.
+
 ## The post-run protocol (core behavior)
 
 After every run, **report the outcome to the user, then ask how they want to proceed.** Do not silently start fixing. Present the result (passed / failed, and the key signal — exception type and message, or the unexpected output) and offer the three paths explicitly:
@@ -84,7 +91,11 @@ Auto mode iterates toward a passing run on its own. It is useful but must stay i
 - **It may change either the plugin code or the scenario** — both are fair game, because the bug can be in either.
 - **Every iteration it must declare what it changed and why** — e.g. "Changed X in the plugin because I believe the cause is Y." No silent edits.
 - **It is bounded.** Cap iterations (3–4 is reasonable); if it has not converged, stop and report what was tried at each step and what was observed, rather than continuing to flail.
+- **2–3 authoring corrections are normal.** On a new scenario, expect two or three of the first iterations to fix the scenario itself — a message-name prefix, an attribute typed wrongly, a missing mock. That is the usual cost of authoring, not a sign the approach is failing. These corrections count toward the 3–4 cap; they do not raise it.
+- **Do not switch to Moq for convenience.** A scenario that is slow to get right is not a reason to drop `xg` and write a new `IOrganizationService` mock instead. If the cap is reached, stop and report.
 - **It must not weaken assertions or bend the plugin just to make a scenario pass.** Three moves on `expectedException` are off-limits, because each of them writes the answer into the question: do **not weaken an existing** `expectedException` — loosening its `typeName` or dropping its `messageContains`; do **not add one** to absorb the exception the run happened to throw; do **not turn a happy-path scenario into a rejection scenario**. Beyond those: do not widen a mock until it stops complaining, and do not edit the plugin solely to satisfy a scenario that may itself be wrong. **If the exception observed is not the one the scenario meant to prove — or if the true cause is uncertain — stop and ask** instead of forcing the result green. Making a test pass is not the goal; understanding and correctly fixing the behavior is.
+
+**The `Execute` boundary is not an absorbed exception.** A call-path scenario that declares `System.NotImplementedException` might look like the forbidden move of adding an `expectedException` to absorb what the run threw. It is allowed only because it does not follow the run. The boundary is deduced **before the first run**, from two things: the request the code passes to `Execute`, and the documented list of requests the host handles. It is written with the exact `typeName` and the exact `messageContains`, and it is paired with a skip path that must stay green. If the `NotImplementedException` was first seen in a run output and nobody declared it beforehand, the move is still forbidden: stop and report it through the post-run protocol. The same holds if it names a request other than the declared one. Never weaken the `typeName` or the `messageContains` of a declared boundary.
 
 ## Controlling the data source
 
