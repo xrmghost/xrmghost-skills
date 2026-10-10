@@ -214,11 +214,94 @@ For a plugin registered with a pre-image, provide a **root-level** `preEntityIma
 - The key (`"PreImage"`) must match the image name registered on the step and read via `Context.PreEntityImages["PreImage"]`.
 - Attribute format matches `inputParameters.Target.attributes`: `{ "value": X }` for OptionSets, `{ "logicalName": "...", "id": "..." }` for EntityReferences.
 
+## New Custom API or webhook wiring: a pair of xg scenarios
+
+When the code adds or changes **wiring** — a Custom API, or a plugin that receives a webhook and calls another API through `IOrganizationService.Execute` — author **a pair of xg scenarios** for it, even when xUnit + Moq tests already cover the logic:
+
+- **The call path** — the input that makes the code call out.
+- **The skip path** — the input that makes the code decide *not* to call out, ending clean.
+
+The pair is what proves the wiring: message name, parameters, branching. The rule against mocks is narrow: do not write a **new mock of `IOrganizationService`** to stand in for these scenarios. xUnit + Moq tests of **pure logic** (parsing, mapping, decisions that never touch the service) stay legitimate and are not replaced by the pair.
+
+### One plugin per run, and the `Execute` boundary
+
+`xg` runs **exactly one plugin type per run** — the one named by `--plugin-type`. There is no pipeline cascade: when that plugin calls another Custom API through `Execute`, the other API's plugin does not run. The call stops at the host's `Execute` boundary instead, which handles only:
+
+- `RetrieveRequest` — on every license;
+- the metadata requests `RetrieveEntityRequest`, `RetrieveAllEntitiesRequest`, `RetrieveAttributeRequest` and `RetrieveRelationshipRequest` — **Pro**: without a Pro license they throw `ProFeatureNotLicensedException`, which `expectedException` can never catch.
+
+**Every other request** throws `System.NotImplementedException` with this message, where `{RequestName}` is the request's name:
+
+```text
+FrameworkOrganizationServiceAdapter.Execute for request type {RequestName} is not yet implemented.
+```
+
+So the call path of a wiring scenario ends at that boundary. Deduce it **before the first run**, from the code: the request is not in the list above, so the scenario declares the boundary exception up front. Declare it exactly:
+
+- `typeName`: `System.NotImplementedException`, fully qualified.
+- `messageContains`: the full sentence above with the real `{RequestName}`. The `{RequestName}` is the string **the plugin code passes** — the argument of `new OrganizationRequest("...")`, or the `RequestName` of the early-bound request class — **without** the `custom_` prefix. The `custom_` prefix belongs only to a scenario's `messageName`.
+
+Two consequences to state to the user:
+
+- **The code after `Execute` is not covered.** Whatever the plugin does with the response — tracing, output parameters, follow-up writes — never runs in the call path. Cover it with a pure-logic test or on a real environment.
+- **The test depends on the host's message text.** If a future host release rewords the message, `messageContains` stops matching and the call path turns red. Re-check the wording against the released host rather than loosening the assertion.
+
+### Example: `custom_contoso_ProcessWebhook` calling `contoso_SendNotification`
+
+The plugin behind the `custom_contoso_ProcessWebhook` Custom API reads `EventType` and `Payload`. For `EventType = "notification"` it calls the `contoso_SendNotification` Custom API with `service.Execute(new OrganizationRequest("contoso_SendNotification") { ["Message"] = payload })`; for any other event it traces and returns, setting `Handled = false`.
+
+Call path — the run is green only because the declared boundary exception is raised, with the exact `RequestName`:
+
+```json
+{
+  "scenarioName": "Custom API - webhook notification reaches contoso_SendNotification",
+  "pluginAssemblyName": "Contoso.Plugins.dll",
+  "pluginTypeName": "Contoso.Plugins.Webhooks.ProcessWebhook",
+  "executionContext": {
+    "messageName": "custom_contoso_ProcessWebhook",
+    "primaryEntityName": "",
+    "stage": 30,
+    "mode": 0,
+    "inputParameters": {
+      "EventType": "notification",
+      "Payload": "Order 1001 shipped"
+    }
+  },
+  "expectedException": {
+    "typeName": "System.NotImplementedException",
+    "messageContains": "FrameworkOrganizationServiceAdapter.Execute for request type contoso_SendNotification is not yet implemented."
+  }
+}
+```
+
+Skip path — no `expectedException`; the run must end clean:
+
+```json
+{
+  "scenarioName": "Custom API - webhook event without notification is skipped",
+  "pluginAssemblyName": "Contoso.Plugins.dll",
+  "pluginTypeName": "Contoso.Plugins.Webhooks.ProcessWebhook",
+  "executionContext": {
+    "messageName": "custom_contoso_ProcessWebhook",
+    "primaryEntityName": "",
+    "stage": 30,
+    "mode": 0,
+    "inputParameters": {
+      "EventType": "heartbeat",
+      "Payload": "ping"
+    }
+  }
+}
+```
+
+Keep the two scenarios distinct. A call path that turns green on a **different** `RequestName`, or a skip path that hits `Execute` at all, means the code calls something you did not declare — that is a finding, not a pass.
+
 ## Custom API scenarios: the parameters
 
 A Custom API scenario differs from an entity plugin in how its **input parameters** are written:
 
 - **Message name**: `custom_<publisherprefix>_<ApiName>`, e.g. `custom_contoso_EvaluateMembership` — the `custom_` segment and the publisher prefix are both required.
+- **Request name is not the message name.** When the code calls another Custom API through `Execute`, the `{RequestName}` asserted in `messageContains` is the name the code passes (`contoso_SendNotification`), never the scenario form `custom_contoso_SendNotification` — see the `Execute` boundary above.
 - **No `Target`**: each declared request parameter is a **direct key** under `inputParameters`, not wrapped in a `Target`.
 - **Primary entity**: empty string `""` or omitted — Custom APIs are global, not bound to a record.
 - **Supported input types**: String, Integer (`42`), Boolean (`true`), Decimal (`12.5`), Guid (as a hex string), DateTime (ISO 8601 string).
