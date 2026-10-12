@@ -36,6 +36,26 @@ Replace placeholder paths below with the project's real build output, typically 
 
 ## Running a scenario
 
+**Mark every `xg` invocation as agent-driven.** For the rest of the session, prefix each `xg` command with two environment variables so the CLI reports `actor=agent` and which agent is running. This applies to every `xg` invocation — `xg run`, `xg license status`, and the `xg env` commands described in [references/env-live-data.md](references/env-live-data.md) — and it adds no command arguments: the flags stay exactly as documented.
+
+- **Set them in the same shell command that invokes `xg`.** Many agents run each command in a new shell, so a variable exported in an earlier call is lost. Only in a persistent shell may you export them once per session instead.
+- **Do not overwrite an existing `XRMGHOST_ACTOR`.** If it is already set in the environment (for example `human`, or a user opt-out), leave it as it is and do not set `XRMGHOST_AGENT_NAME` either. The forms below are conditional: they assign both variables only when `XRMGHOST_ACTOR` is unset, and otherwise invoke `xg` with nothing assigned.
+- **`<name>` is your own identifier, from this closed list only:** `claude-code`, `codex`, `copilot-cli`, `opencode`, `pi`, `gemini-cli`, `cursor`, `cline`, `mcp`, `other`. Replace the quoted `'<name>'` placeholder (keep the quotes); if you are not certain which one you are, omit `XRMGHOST_AGENT_NAME` entirely and let the CLI fall back to its own detection.
+
+Bash (one line, same command; the subshell keeps the export from leaking):
+
+```bash
+( [ -n "${XRMGHOST_ACTOR:-}" ] || export XRMGHOST_ACTOR="${XRMGHOST_ACTOR:-agent}" XRMGHOST_AGENT_NAME='<name>'; xg run ... )
+```
+
+PowerShell (one line, same command):
+
+```powershell
+if (-not $env:XRMGHOST_ACTOR) { $env:XRMGHOST_ACTOR = 'agent'; $env:XRMGHOST_AGENT_NAME = '<name>' }; xg run ...
+```
+
+The commands below are written without the prefix for readability; add it every time you run them.
+
 ```bash
 xg run --assembly-path <path_to_dll> --plugin-type <full_type_name> --scenario <path_to_scenario_json>
 ```
@@ -43,10 +63,16 @@ xg run --assembly-path <path_to_dll> --plugin-type <full_type_name> --scenario <
 Example:
 
 ```bash
-xg run \
+( [ -n "${XRMGHOST_ACTOR:-}" ] || export XRMGHOST_ACTOR="${XRMGHOST_ACTOR:-agent}" XRMGHOST_AGENT_NAME='<name>'; xg run \
   --assembly-path "bin/Debug/net472/MyCompany.Plugins.dll" \
   --plugin-type "MyCompany.Plugins.Contact.EnrichContact" \
-  --scenario "scenarios/EnrichContact_HappyPath.json"
+  --scenario "scenarios/EnrichContact_HappyPath.json" )
+```
+
+The same example in PowerShell:
+
+```powershell
+if (-not $env:XRMGHOST_ACTOR) { $env:XRMGHOST_ACTOR = 'agent'; $env:XRMGHOST_AGENT_NAME = '<name>' }; xg run --assembly-path "bin/Debug/net472/MyCompany.Plugins.dll" --plugin-type "MyCompany.Plugins.Contact.EnrichContact" --scenario "scenarios/EnrichContact_HappyPath.json"
 ```
 
 ## Debugging line by line
