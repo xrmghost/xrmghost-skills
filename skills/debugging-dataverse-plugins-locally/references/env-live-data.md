@@ -1,12 +1,12 @@
 # Live data & environment management (Pro)
 
-Reference for using XrmGhost against a **real Dataverse environment** in read-only mode, instead of (or alongside) mocked data. This is a **Pro-licensed** capability; on a standard license it is unavailable and the default `mock` data source is the only option. Load this material only when the user is on Pro and explicitly wants live or `auto` data.
+Reference for using XrmGhost against a **real Dataverse environment** in read-only mode, instead of (or alongside) mocked data. This is a **Pro-licensed** capability; on a standard license live is never contacted, and the default `auto` data source answers from the scenario mocks, as `mock` does. Load this material only when the user is on Pro and explicitly wants live or `auto` data.
 
 ## What this enables
 
-By default, `xg run` resolves `RetrieveMultiple` queries only against data mocked inside the scenario. With an environment configured, the `--data-source` flag can pull real data:
+Without an active environment, `xg run` resolves `Retrieve` and `RetrieveMultiple` only against data mocked inside the scenario. With an environment configured, the `--data-source` flag reads real data:
 
-- `auto` — try the scenario's mocked data first; for anything not mocked, fall back to the live environment.
+- `auto` (default) — live first. `Retrieve` falls back to the scenario mocks only when the record does not exist in Dataverse or live is unavailable; `RetrieveMultiple` reads live only, and a failed live attempt returns an empty result with a warning, not mock rows.
 - `live` — ignore mocks entirely and query the live environment.
 
 Access is **read-only**: XrmGhost reads from the environment to satisfy queries during a local run; it does not write back.
@@ -31,7 +31,7 @@ To avoid hitting the live environment repeatedly for the same reads across runs,
 The data source chosen here changes how scenarios should be written:
 
 - Under `mock`, every record a query needs must be present in the scenario.
-- Under `auto`, mock only what you want to pin or override; the rest comes live.
+- Under `auto` with an active environment, live wins: mock only `Retrieve` records that do not exist in Dataverse (for example, created by the run); query mocks are not read.
 - Under `live`, query-backing data in the scenario is ignored — keep the scenario focused on the `Target`, input parameters, and expected outcome.
 
 Decide the data source **before** authoring the backing data of a scenario, so effort is not spent mocking data that will be read live.

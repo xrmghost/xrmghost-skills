@@ -125,17 +125,17 @@ Auto mode iterates toward a passing run on its own. It is useful but must stay i
 
 ## Controlling the data source
 
-The `--data-source` flag governs how `RetrieveMultiple` queries resolve at run time:
+The `--data-source` flag governs how `Retrieve`, `RetrieveMultiple` and `RetrieveMultipleRequest` reads resolve at run time:
 
-- `mock` (default): only mocked data; empty result if nothing matches.
-- `auto`: mocked data first, fall back to a live environment if no mock matches.
-- `live`: always query the live environment, ignoring mocks.
+- `auto` (default, live-first): on Standard, or on Pro with no active environment, live is never contacted and the scenario mocks answer — the same result as `mock`. On Pro with an active environment, `Retrieve` reads live first and falls back to the mocks only when the record does not exist in Dataverse or live is unavailable; `RetrieveMultiple` reads live only, and a failed live attempt returns an empty result with a warning, never mock rows.
+- `mock`: only mocked data; Dataverse is never contacted; empty result if nothing matches.
+- `live` (Pro): always query the live environment, ignoring mocks.
 
 ```bash
 xg run --assembly-path <dll> --plugin-type <type> --scenario <json> --data-source auto
 ```
 
-`auto` and `live` are **not available by default**: they require a Pro license and a configured read-only Dataverse environment. On a standard license, or with no environment configured, stay on `mock`. The full environment workflow (`xg env`, registering and selecting environments, data caching) is Pro-specific and lives in **[references/env-live-data.md](references/env-live-data.md)** — load it only when the user is on Pro and actually wants live/auto data. Do not attempt to configure environments from within a scenario.
+Reading live data requires a Pro license and a configured read-only Dataverse environment. On a standard license, or with no environment configured, the default `auto` answers from the scenario mocks; pass `--data-source mock` to make that explicit. The full environment workflow (`xg env`, registering and selecting environments, data caching) is Pro-specific and lives in **[references/env-live-data.md](references/env-live-data.md)** — load it only when the user is on Pro and actually wants live/auto data. Do not attempt to configure environments from within a scenario.
 
 > Note for scenario authors: the chosen data source changes *what to mock*. Under `live`/`auto`, data coming from the real environment should not be mocked. That decision belongs to scenario authoring.
 

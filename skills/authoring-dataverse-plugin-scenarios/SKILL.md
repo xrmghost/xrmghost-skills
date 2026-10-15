@@ -330,8 +330,8 @@ Backing data (`retrieveResponses`, `entities`) works exactly as above — a Cust
 
 Before mocking backing data, know which data source the run will use (set by `--data-source` at run time):
 
-- `mock` (default): every record a query or retrieve needs must be in the scenario.
-- `auto` (Pro): mock only what you want to pin or override; the rest is read live.
+- `auto` (default, live-first): on Standard, or on Pro with no active environment, it behaves as `mock`. On Pro with an active environment, a `Retrieve` mock answers only when the record is missing in Dataverse or live is unavailable, and `RetrieveMultiple` never reads mocks.
+- `mock`: every record a query or retrieve needs must be in the scenario.
 - `live` (Pro): backing data in the scenario is ignored — keep the scenario focused on `Target`, input parameters, and expected outcome.
 
 If the run will be live or auto, **do not mock data that will come from the real environment** — those mocks are dead weight and can mislead. Decide this before writing the backing data.
