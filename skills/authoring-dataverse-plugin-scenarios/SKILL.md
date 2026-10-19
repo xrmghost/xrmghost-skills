@@ -59,7 +59,7 @@ Inside any `attributes` object, value typing must be explicit or the framework m
 - **EntityReference / lookup**: `{ "logicalName": "...", "id": "...", "name": "..." }` (`name` optional).
 - **GUIDs must be valid hex.** IDs with non-hex characters fail to parse inside EntityReference objects. Use real GUIDs for test records.
 
-> **Requires XrmGhost 1.7.6 or later.** The tagged Money form, the explicit OptionSetValue tag, and every Retrieve behavior described under *Supplying data the code reads* (Retrieve reading the `entities` seed, precedence of in-run mutations, ColumnSet projection, the Dataverse fault instead of `KeyNotFoundException`, a malformed seed failing the run) apply from **1.7.6**. Check the installed version with `xg --version`, or bring the host up to date with `xg setup host --update`. On earlier versions `{ "type": "Money", "value": X }` is read as an OptionSetValue, and Retrieve does not see `entities`.
+> **Requires XrmGhost 1.7.6 or later.** The tagged Money form, the explicit OptionSetValue tag, and the Retrieve behaviors described under *Supplying data the code reads* (Retrieve reading the `entities` seed, the mock-mode precedence of in-run mutations, ColumnSet projection, the Dataverse fault instead of `KeyNotFoundException` on a Retrieve, a malformed seed failing the run) apply from **1.7.6**. Check the installed version with `xg --version`, or bring the host up to date with `xg setup host --update`. On earlier versions `{ "type": "Money", "value": X }` is read as an OptionSetValue, and Retrieve does not see `entities`. This note does **not** cover the `Update`/`Delete` faults nor the CRUD routing of `Execute`: those carry their own marker, under *Writes the code makes* and *The `Execute` boundary*.
 
 ## Describing the expected outcome
 
@@ -137,6 +137,8 @@ Each `retrieveResponses` entry matches one `Service.Retrieve(entityName, id, ...
 
 A record that is not in `retrieveResponses` can be supplied through the root-level `entities` seed instead (shape below): `Retrieve` finds it there by logical name and id. The two structures can coexist in the same scenario — `retrieveResponses` stays the explicit answer for a given Retrieve, `entities` the data both Retrieve and RetrieveMultiple can read.
 
+The asymmetry is deliberate: **`retrieveResponses` does not feed `RetrieveMultiple`.** A record described only there is invisible to a query until a mutation of the run — an `Update` of it — puts it into the run state; from then on the query sees it. A record a query must find from the start goes in `entities`.
+
 ### `RetrieveMultiple` (query) → root-level `entities`
 
 For `Service.RetrieveMultiple()`, provide candidate records under a **root-level** `entities` key (a sibling of `executionContext`), grouped by logical name. Here attributes sit **directly on the entity object**, NOT nested under `attributes` — the opposite of `retrieveResponses`.
@@ -166,13 +168,18 @@ Rules for `entities`:
 
 ### Which source a `Retrieve` sees (precedence)
 
-When more than one source holds the same record (logical name + id), `Retrieve` answers from the first one that has it, in this order:
+With `--data-source mock`, when more than one source holds the same record (logical name + id), `Retrieve` answers from the first one that has it, in this order:
 
-1. **In-run mutations** — what the code itself did earlier in the same run. After an `Update`, the next `Retrieve` of that record sees the updated values; after a `Delete`, the next `Retrieve` of that record is not-found (the fault below), even if `retrieveResponses` or `entities` still describe it.
+1. **In-run mutations** — what the code itself did earlier in the same run (`Create`, `Update`, `Delete`; see *Writes the code makes*). After an `Update`, a later `Retrieve` of that record sees the updated values; after a `Delete`, a later `Retrieve` of that record is not-found (the fault below), even if `retrieveResponses` or `entities` still describe it.
 2. **`retrieveResponses`** — the explicit answer.
 3. **`entities`** seed.
 
-This consistency covers the next `Retrieve` in the same run only; do not rely on `Update`/`Delete` being reflected anywhere else.
+With `auto` and `live` the order is different, because Dataverse comes first:
+
+- **`auto`** — `Retrieve` and `RetrieveMultiple` ask Dataverse first. A `Retrieve` falls back to the run state and the mocks (in the order above) only when Dataverse answers that the record does not exist or cannot be reached. A `RetrieveMultiple` reads the mocks only when no live attempt is made (no Pro license or no active environment); a live attempt that fails returns an empty collection with a warning, not mock rows. So a record Dataverse holds is answered **by Dataverse**, not by the run state: an `Update` or `Delete` the code made on it earlier in the run is not reflected in that answer.
+- **`live`** — `Retrieve` and `RetrieveMultiple` never read the mocks nor the run state.
+
+The in-run consistency "a mutation is visible to the next `Retrieve`/`RetrieveMultiple`" therefore holds in `mock`, and in `auto` only for records Dataverse does not have.
 
 ### Which columns a `Retrieve` returns (ColumnSet)
 
@@ -193,6 +200,79 @@ A `Retrieve` of a record no source has — or with `Guid.Empty` as id, or after 
   "typeName": "System.ServiceModel.FaultException`1[[Microsoft.Xrm.Sdk.OrganizationServiceFault, Microsoft.Xrm.Sdk, Version=9.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35]]"
 }
 ```
+
+With `--data-source live`, a Retrieve of a record Dataverse does not have raises Dataverse's own fault, unchanged — same type, same `typeName`.
+
+## Writes the code makes: `Create`, `Update`, `Delete` (the run state)
+
+> **Requires the first host release after 1.7.x that includes ADO-3974.** The `Update`/`Delete` faults below and the CRUD routing of `Execute` are not in 1.7.6: on earlier hosts an `Update` or `Delete` of an unknown record does not fault. Check with `xg --version` and update with `xg setup host --update`.
+
+`Create`, `Update` and `Delete` write into the **run state**: an in-memory record of what the code did during this run. The run state:
+
+- **outranks the declared sources** — a record updated or deleted in the run reads as the run left it, whatever `retrieveResponses` or `entities` still say (in `mock`; see the precedence above for `auto`/`live`);
+- **is shared by every service** of the run — a record written through one `IOrganizationService` reads the same through another;
+- **never rewrites the scenario and never writes to Dataverse** — in every data source, `live` included. The next run starts again from the scenario as written.
+
+The existence checks of these verbs read the records declared in the scenario **in every data source**: a `Create` duplicate, the base an `Update` merges onto, the record a `Delete` removes — in `auto` and `live` too.
+
+### Verb → effect on the run state → fault
+
+The fault messages below use `{entity}` and `{id}` for the logical name and id of the call. Every fault in this table is `FaultException<OrganizationServiceFault>`, declared with the same `typeName` as *When the record is not there*.
+
+| Verb | Effect on the run state | Fault |
+|---|---|---|
+| `Create` | Adds the record, with the id it passed or a generated one; a later `Update`/`Delete` finds it. | Explicit id already known to any source of the run — `entities`, `organizationServiceMock.retrieveResponses`, a record created or updated in the run — raises ErrorCode `0x80040237` (DuplicateRecord), message `Cannot insert duplicate key. {entity} With Id = {id} already exists.` A record deleted in the run does not count as known. |
+| `Retrieve` | None. | Record no source has, `Guid.Empty`, or deleted in the run: ErrorCode `0x80040217`, message `{entity} With Id = {id} Does Not Exist` (`mock`; `auto`/`live` per the precedence above). |
+| `RetrieveMultiple` | None. | No fault for "no match": the collection is empty. |
+| `Update` | Merges the attributes passed onto the record as `Retrieve` would read it from the run's sources; the attributes passed are kept. A record known only to Dataverse is kept in the run with just the attributes passed. Nothing is written to Dataverse. | Record unknown to every source, `Guid.Empty`, or deleted earlier in the run: ErrorCode `0x80040217`, message `{entity} With Id = {id} Does Not Exist`. |
+| `Delete` | Leaves a **tombstone** for the record in the run. Nothing is deleted in Dataverse. | Same as `Update`: ErrorCode `0x80040217`, message `{entity} With Id = {id} Does Not Exist`. |
+| `Execute(CreateRequest)` | As `Create`. | As `Create`. |
+| `Execute(RetrieveRequest)` | As `Retrieve`. | As `Retrieve`. |
+| `Execute(RetrieveMultipleRequest)` | As `RetrieveMultiple`. | As `RetrieveMultiple`. |
+| `Execute(UpdateRequest)` | As `Update`. | As `Update`. |
+| `Execute(DeleteRequest)` | As `Delete`. | As `Delete`. |
+
+An `Execute` request whose `Target` (or, for `RetrieveMultipleRequest`, `Query`) is null throws `System.InvalidOperationException` before reaching the verb.
+
+### How `Update` and `Delete` decide the record exists
+
+In order:
+
+1. **The run's tombstone wins.** A record deleted earlier in the run makes any later `Update` or `Delete` of it fault with `0x80040217`, in **every** data source, without asking Dataverse. The tombstone outranks Dataverse **only for this existence check**: a `Retrieve`/`RetrieveMultiple` in `auto` or `live` still asks Dataverse first (see the precedence above).
+2. **The run's sources** — the run state, `retrieveResponses`, the `entities` seed — in every data source.
+3. **Dataverse**, only in `auto` and `live` with a Pro license and an active environment. If Dataverse answers that the record does not exist, its own fault (`0x80040217`) is raised unchanged. If the live check fails for any other reason, the record is treated as not existing — the `0x80040217` fault, plus a warning in `auto`.
+
+`Guid.Empty` never exists. In `mock` there is no step 3.
+
+### Happy path: `Update` / `Delete` of an existing record
+
+- **`mock`** — declare the record first, in `entities` or in `organizationServiceMock.retrieveResponses`. Without it the call faults.
+- **`auto` / `live`** — a record that exists in Dataverse is **not** declared: the existence check finds it there, and the update or delete stays in the run state without writing to Dataverse. Declare it only when it is not in Dataverse.
+
+A plugin that loads an account and updates its phone number, run with `--data-source mock`:
+
+```json
+"entities": {
+  "account": [
+    { "logicalName": "account", "id": "3c9f7c1f-0d9b-4c7e-af1d-8f4b6c3d2e1b", "name": "Contoso Ltd", "telephone1": "+1 555 0100" }
+  ]
+}
+```
+
+After `Update` with `telephone1 = "+1 555 0199"`, a later `Retrieve` in the same run returns `name = "Contoso Ltd"` and `telephone1 = "+1 555 0199"`. After `Delete`, a later `Retrieve`, `Update` or `Delete` of that id faults with `0x80040217`.
+
+### Failure path: `Update` / `Delete` of a record that is not there
+
+A record no source knows, `Guid.Empty` as id, or a record already deleted in the run: the call raises `FaultException<OrganizationServiceFault>` with ErrorCode `0x80040217`, as Dataverse does. When the plugin lets it propagate, declare exactly:
+
+```json
+"expectedException": {
+  "typeName": "System.ServiceModel.FaultException`1[[Microsoft.Xrm.Sdk.OrganizationServiceFault, Microsoft.Xrm.Sdk, Version=9.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35]]",
+  "messageContains": "Does Not Exist"
+}
+```
+
+When the plugin catches it and wraps it in `InvalidPluginExecutionException`, declare the wrapper, as under *How `expectedException` is matched*. A duplicate `Create` takes the same `typeName`, with `messageContains: "already exists"`.
 
 ## Pre-entity images (PreImage)
 
@@ -227,7 +307,7 @@ The pair is what proves the wiring: message name, parameters, branching. The rul
 
 `xg` runs **exactly one plugin type per run** — the one named by `--plugin-type`. There is no pipeline cascade: when that plugin calls another Custom API through `Execute`, the other API's plugin does not run. The call stops at the host's `Execute` boundary instead, which handles only:
 
-- `RetrieveRequest` — on every license;
+- the CRUD requests `CreateRequest`, `UpdateRequest`, `DeleteRequest`, `RetrieveRequest` and `RetrieveMultipleRequest` — on every license, each delegated to the matching method (`Create`, `Update`, `Delete`, `Retrieve`, `RetrieveMultiple`), with the same run-state effect and the same faults (see *Verb → effect on the run state → fault*). **Requires the first host release after 1.7.x that includes ADO-3974** for `CreateRequest`, `UpdateRequest` and `DeleteRequest`; on earlier hosts they fall into the `NotImplementedException` below;
 - the metadata requests `RetrieveEntityRequest`, `RetrieveAllEntitiesRequest`, `RetrieveAttributeRequest` and `RetrieveRelationshipRequest` — **Pro**: without a Pro license they throw `ProFeatureNotLicensedException`, which `expectedException` can never catch.
 
 **Every other request** throws `System.NotImplementedException` with this message, where `{RequestName}` is the request's name:
@@ -332,9 +412,9 @@ Before mocking backing data, know which data source the run will use (set by `--
 
 - `mock` (default): every record a query or retrieve needs must be in the scenario.
 - `auto` (Pro): mock only what you want to pin or override; the rest is read live.
-- `live` (Pro): backing data in the scenario is ignored — keep the scenario focused on `Target`, input parameters, and expected outcome.
+- `live` (Pro): `Retrieve` and `RetrieveMultiple` ignore the backing data in the scenario — keep the scenario focused on `Target`, input parameters, and expected outcome. `Create`, `Update` and `Delete` still read the declared records (duplicate check, merge base, existence), as in every data source.
 
-If the run will be live or auto, **do not mock data that will come from the real environment** — those mocks are dead weight and can mislead. Decide this before writing the backing data.
+If the run will be live or auto, **do not mock data that will come from the real environment** — those mocks are dead weight and can mislead. Decide this before writing the backing data. Whatever the data source, the code's writes stay in the run state: nothing is written to Dataverse.
 
 ## Best practices
 
