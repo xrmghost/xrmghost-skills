@@ -205,7 +205,7 @@ With `--data-source live`, a Retrieve of a record Dataverse does not have raises
 
 ## Writes the code makes: `Create`, `Update`, `Delete` (the run state)
 
-> **Requires the first host release after 1.7.x that includes ADO-3974.** The `Update`/`Delete` faults below and the CRUD routing of `Execute` are not in 1.7.6: on earlier hosts an `Update` or `Delete` of an unknown record does not fault. Check with `xg --version` and update with `xg setup host --update`.
+> **Requires the first host release after 1.1.0 that includes ADO-3974.** The `Update`/`Delete` faults below and the CRUD routing of `Execute` are not in 1.7.6: on earlier hosts an `Update` or `Delete` of an unknown record does not fault. Check with `xg --version` and update with `xg setup host --update`.
 
 `Create`, `Update` and `Delete` write into the **run state**: an in-memory record of what the code did during this run. The run state:
 
@@ -307,7 +307,7 @@ The pair is what proves the wiring: message name, parameters, branching. The rul
 
 `xg` runs **exactly one plugin type per run** — the one named by `--plugin-type`. There is no pipeline cascade: when that plugin calls another Custom API through `Execute`, the other API's plugin does not run. The call stops at the host's `Execute` boundary instead, which handles only:
 
-- the CRUD requests `CreateRequest`, `UpdateRequest`, `DeleteRequest`, `RetrieveRequest` and `RetrieveMultipleRequest` — on every license, each delegated to the matching method (`Create`, `Update`, `Delete`, `Retrieve`, `RetrieveMultiple`), with the same run-state effect and the same faults (see *Verb → effect on the run state → fault*). **Requires the first host release after 1.7.x that includes ADO-3974** for `CreateRequest`, `UpdateRequest` and `DeleteRequest`; on earlier hosts they fall into the `NotImplementedException` below;
+- the CRUD requests `CreateRequest`, `UpdateRequest`, `DeleteRequest`, `RetrieveRequest` and `RetrieveMultipleRequest` — on every license, each delegated to the matching method (`Create`, `Update`, `Delete`, `Retrieve`, `RetrieveMultiple`), with the same run-state effect and the same faults (see *Verb → effect on the run state → fault*). **Requires the first host release after 1.1.0 that includes ADO-3974** for `CreateRequest`, `UpdateRequest` and `DeleteRequest`; on earlier hosts they fall into the `NotImplementedException` below;
 - the metadata requests `RetrieveEntityRequest`, `RetrieveAllEntitiesRequest`, `RetrieveAttributeRequest` and `RetrieveRelationshipRequest` — **Pro**: without a Pro license they throw `ProFeatureNotLicensedException`, which `expectedException` can never catch.
 
 **Every other request** throws `System.NotImplementedException` with this message, where `{RequestName}` is the request's name:
