@@ -30,8 +30,9 @@ To avoid hitting the live environment repeatedly for the same reads across runs,
 
 The data source chosen here changes how scenarios should be written:
 
-- Under `mock`, every record a query or retrieve needs must be present in the scenario.
-- Under `auto` with an active environment, live wins: query mocks (`RetrieveMultiple`, `RetrieveMultipleRequest`, `QueryByAttribute`) are never read, and a `Retrieve` mock matters only as the fallback for a record that does not exist in Dataverse (for example, one the run itself creates) or when live is unavailable.
+- Under `mock`, every record a query or retrieve needs must be present in the scenario; Dataverse is never contacted, regardless of license or environment.
+- Under `auto` on Standard, or with no active environment, this behaves exactly like `mock`: every record a query or retrieve needs must be present in the scenario.
+- Under `auto` with a Pro license and an active environment, live wins: query mocks (`RetrieveMultiple`, `RetrieveMultipleRequest`, `QueryByAttribute`) are never read, and a `Retrieve` mock matters only as the fallback for a record that does not exist in Dataverse (for example, one the run itself creates) or when live is unavailable.
 - Under `live`, query-backing data in the scenario is ignored — keep the scenario focused on the `Target`, input parameters, and expected outcome.
 
 Decide the data source **before** authoring the backing data of a scenario, so effort is not spent mocking data that will be read live. For reproducible runs — CI, or any scenario shared between people — use `--data-source mock` explicitly rather than relying on the environment state behind `auto`.
