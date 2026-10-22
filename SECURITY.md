@@ -12,9 +12,10 @@ This policy covers the `xrmghost-skills` repository only — the Markdown skill 
 
 ## Data Handling
 
-- By default, these skills work with local scenario content and the standard `mock` data source.
-- The `--data-source auto` and `--data-source live` modes are opt-in, require a Pro license, and are only used when the user explicitly chooses them.
-- In `auto` and `live`, XrmGhost reads Dataverse data in read-only mode; the skills do not write data back to the environment.
+- The default `--data-source` is `auto`. On a standard license, or with no active environment, `auto` answers from local scenario content only, exactly as `mock` does — Dataverse is never contacted.
+- On a Pro license with an active environment, `auto` is live-first: a `Retrieve` falls back to local scenario content only when the record is missing in Dataverse or live is unavailable; multi-record reads (`RetrieveMultiple` and equivalents) never fall back to scenario content.
+- `--data-source mock` never contacts Dataverse, on any license. `--data-source live` requires a Pro license and reads only Dataverse, never local scenario content.
+- In `auto` and `live`, any Dataverse access is read-only; the skills do not write data back to the environment.
 - Live data retrieved for local runs can be cached locally to reduce repeated reads.
 - Users can clear a stale local cache to force fresh reads.
 - The skills do not transmit data to third-party services.

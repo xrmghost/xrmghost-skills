@@ -328,13 +328,13 @@ Backing data (`retrieveResponses`, `entities`) works exactly as above — a Cust
 
 ## How the data source affects what you mock
 
-Before mocking backing data, know which data source the run will use (set by `--data-source` at run time):
+Before mocking backing data, know which data source the run will use (set by `--data-source` at run time; the flag is omitted by default, which means `auto`):
 
-- `mock` (default): every record a query or retrieve needs must be in the scenario.
-- `auto` (Pro): mock only what you want to pin or override; the rest is read live.
+- `auto` (default): on Standard, or on Pro with no active environment, this behaves exactly like `mock` — every record a query or retrieve needs must be in the scenario. On Pro with an active environment, query mocks (feeding `RetrieveMultiple`, `RetrieveMultipleRequest`, `QueryByAttribute`) are never read; mock a `Retrieve` only for a record missing from Dataverse (for example, one the run itself creates) or as the fallback if live is unavailable.
+- `mock`: every record a query or retrieve needs must be in the scenario; Dataverse is never contacted.
 - `live` (Pro): backing data in the scenario is ignored — keep the scenario focused on `Target`, input parameters, and expected outcome.
 
-If the run will be live or auto, **do not mock data that will come from the real environment** — those mocks are dead weight and can mislead. Decide this before writing the backing data.
+On Pro with an active environment, under `auto` or `live`, **do not mock data that will come from the real environment** — those mocks are dead weight and can mislead, except the `Retrieve` fallback described above. Decide this before writing the backing data. For reproduction, CI, or any scenario shared between people, use `--data-source mock` explicitly — it is deterministic, where `auto` depends on whatever environment happens to be active.
 
 ## Best practices
 
