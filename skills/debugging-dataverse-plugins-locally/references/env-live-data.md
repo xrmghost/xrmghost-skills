@@ -4,7 +4,7 @@ Reference for using XrmGhost against a **real Dataverse environment** in read-on
 
 ## What this enables
 
-Without an active environment, `xg run` resolves `Retrieve`, `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` only against data mocked inside the scenario — the same as `mock`. With a Pro license and an active environment selected, the `--data-source` flag (omitted means `auto`) reads real data:
+Without an active environment, the default `auto` (like `mock`) resolves `Retrieve`, `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` only against data mocked inside the scenario; `live` never reads mocks (see below). With a Pro license and an active environment selected, the `--data-source` flag (omitted means `auto`) reads real data:
 
 - `auto` (default) — live-first. `Retrieve` reads live and falls back to the scenario mock only when the record does not exist in Dataverse or live is unavailable, with a warning; any other Dataverse fault reaches the plugin unchanged. `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` always read live and never fall back to mocks: if the live attempt is unavailable the result is an empty collection with a warning, and a fault Dataverse actually returns reaches the plugin.
 - `live` — ignore mocks entirely. Without a Pro license, without an active environment, or when live is unavailable, `Retrieve` raises an exception (with a warning); otherwise any Dataverse fault — including a missing record — reaches the plugin. `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` return an empty collection with a warning when live is unavailable, and reach the plugin on a Dataverse fault.
