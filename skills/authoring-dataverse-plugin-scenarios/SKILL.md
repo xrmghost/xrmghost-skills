@@ -176,10 +176,10 @@ With `--data-source mock`, when more than one source holds the same record (logi
 
 With `auto` and `live` the order is different, because Dataverse comes first:
 
-- **`auto`** — `Retrieve` and `RetrieveMultiple` ask Dataverse first. A `Retrieve` falls back to the run state and the mocks (in the order above) only when Dataverse answers that the record does not exist or cannot be reached. A `RetrieveMultiple` reads the mocks only when no live attempt is made (no Pro license or no active environment); a live attempt that fails returns an empty collection with a warning, not mock rows. So a record Dataverse holds is answered **by Dataverse**, not by the run state: an `Update` or `Delete` the code made on it earlier in the run is not reflected in that answer.
+- **`auto`** — `Retrieve` and `RetrieveMultiple` ask Dataverse first. A `Retrieve` falls back to the run state and the mocks (in the order above) only when Dataverse answers that the record does not exist or cannot be reached. A `RetrieveMultiple` reads the mocks and the run state only when no live attempt is made (no Pro license or no active environment). When the live query is attempted, an empty live result does **not** trigger a fallback: the collection is empty. The Dataverse faults selected by `LiveRequestFaultPolicy` are propagated to the code; any other error of the live attempt yields an empty collection with a warning, never mock rows. So a record Dataverse holds is answered **by Dataverse**, not by the run state: an `Update` or `Delete` the code made on it earlier in the run is not reflected in that answer.
 - **`live`** — `Retrieve` and `RetrieveMultiple` never read the mocks nor the run state.
 
-The in-run consistency "a mutation is visible to the next `Retrieve`/`RetrieveMultiple`" therefore holds in `mock`, and in `auto` only for records Dataverse does not have.
+The in-run consistency "a mutation is visible to the next read" therefore differs by verb. In `mock` it holds for both `Retrieve` and `RetrieveMultiple`. In `auto`, `Retrieve` sees the run state only in its fallback (record not found or Dataverse unreachable), so only for records Dataverse does not have; `RetrieveMultiple` sees it only when no live query is attempted (no Pro license or no active environment) — never after a live attempt, even an empty one.
 
 ### Which columns a `Retrieve` returns (ColumnSet)
 
