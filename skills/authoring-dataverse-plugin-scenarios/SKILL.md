@@ -328,13 +328,13 @@ Backing data (`retrieveResponses`, `entities`) works exactly as above — a Cust
 
 ## How the data source affects what you mock
 
-Before mocking backing data, know which data source the run will use (set by `--data-source` at run time):
+Before mocking backing data, know which data source the run will use (set by `--data-source` at run time; the flag is omitted by default, which means `auto`):
 
-- `mock` (default): every record a query or retrieve needs must be in the scenario.
-- `auto` (Pro): mock only what you want to pin or override; the rest is read live.
-- `live` (Pro): backing data in the scenario is ignored — keep the scenario focused on `Target`, input parameters, and expected outcome.
+- `auto` (default): on Standard, or on Pro with no active environment, Dataverse is never contacted and this behaves exactly like `mock` — every record a query or retrieve needs must be in the scenario. On Pro with an active environment, `Retrieve` reads live first and falls back to the scenario mock only when the record does not exist in Dataverse (for example, one the run itself creates) or live is unavailable or fails, with a warning; any other Dataverse fault reaches the plugin unchanged. `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` go live and never fall back to mocks after a live attempt that fails — the result is then an empty collection with a warning, never mock rows — while a fault Dataverse actually returns reaches the plugin.
+- `mock`: every record a query or retrieve needs must be in the scenario; Dataverse is never contacted.
+- `live` (Pro): backing data in the scenario is ignored entirely — mocks are never read. Dataverse is only read, never written. `Retrieve` without a Pro license, without an active environment, or when live is unavailable or fails raises an exception (with a warning); any Dataverse fault — including a missing record — reaches the plugin. `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` return an empty collection with a warning in those same conditions, and a Dataverse fault reaches the plugin.
 
-If the run will be live or auto, **do not mock data that will come from the real environment** — those mocks are dead weight and can mislead. Decide this before writing the backing data.
+On Pro with an active environment, under `auto` or `live`, **do not mock data that will come from the real environment** — those mocks are dead weight and can mislead, except the `Retrieve` fallback described above. Decide this before writing the backing data. For reproduction, CI, or any scenario shared between people, use `--data-source mock` explicitly — it is deterministic, where `auto` depends on whatever environment happens to be active. Under `auto` and `live`, any Dataverse access is read-only — the run never writes data back to the environment.
 
 ## Best practices
 

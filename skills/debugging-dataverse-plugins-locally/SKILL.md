@@ -125,19 +125,19 @@ Auto mode iterates toward a passing run on its own. It is useful but must stay i
 
 ## Controlling the data source
 
-The `--data-source` flag governs how `RetrieveMultiple` queries resolve at run time:
+The `--data-source` flag governs how `Retrieve`, `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` reads resolve at run time. The flag is omitted by default, which means `auto`:
 
-- `mock` (default): only mocked data; empty result if nothing matches.
-- `auto`: mocked data first, fall back to a live environment if no mock matches.
-- `live`: always query the live environment, ignoring mocks.
+- `auto` (default): on Standard, or on Pro with no active environment, live is never contacted — the scenario mocks answer, exactly as `mock` does. On Pro with an active environment: `Retrieve` reads live first and falls back to the scenario mock only when the record does not exist in Dataverse or live is unavailable, with a warning — any other Dataverse fault reaches the plugin unchanged; `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` always read live and never fall back to mocks — if the live attempt is unavailable the result is an empty collection with a warning, and a fault Dataverse actually returns reaches the plugin.
+- `mock`: only the scenario's mocked data; Dataverse is never contacted. If nothing matches, `Retrieve` raises the same "record does not exist" fault Dataverse itself would raise, while `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` return an empty collection.
+- `live` (Pro): always query Dataverse, mocks are never read. Without a Pro license, without an active environment, or when live is unavailable, `Retrieve` raises an exception (with a warning); otherwise any Dataverse fault — including a missing record — reaches the plugin. `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` return an empty collection with a warning when live is unavailable, and reach the plugin on a Dataverse fault.
 
 ```bash
-xg run --assembly-path <dll> --plugin-type <type> --scenario <json> --data-source auto
+xg run --assembly-path <dll> --plugin-type <type> --scenario <json> --data-source mock
 ```
 
-`auto` and `live` are **not available by default**: they require a Pro license and a configured read-only Dataverse environment. On a standard license, or with no environment configured, stay on `mock`. The full environment workflow (`xg env`, registering and selecting environments, data caching) is Pro-specific and lives in **[references/env-live-data.md](references/env-live-data.md)** — load it only when the user is on Pro and actually wants live/auto data. Do not attempt to configure environments from within a scenario.
+Reading live data requires a Pro license and a configured read-only Dataverse environment. On a standard license, or with no environment configured, the default `auto` answers from the scenario mocks — pass `--data-source mock` to make that explicit. For reproduction, CI and any scenario shared between people, prefer `--data-source mock` explicitly: it is deterministic, where `auto` depends on whatever environment happens to be active. The full environment workflow (`xg env`, registering and selecting environments, data caching) is Pro-specific and lives in **[references/env-live-data.md](references/env-live-data.md)** — load it only when the user is on Pro and actually wants live/auto data. Do not attempt to configure environments from within a scenario.
 
-> Note for scenario authors: the chosen data source changes *what to mock*. Under `live`/`auto`, data coming from the real environment should not be mocked. That decision belongs to scenario authoring.
+> Note for scenario authors: the chosen data source changes *what to mock*. Under `auto` on Standard or with no active environment, write backing data exactly as you would for `mock`. Under `auto` on Pro with an active environment, query mocks (`RetrieveMultiple`, `RetrieveMultipleRequest`, `QueryByAttribute`) are never read, and a `Retrieve` mock matters only as the fallback for a record missing from Dataverse or when live is unavailable. Under `live`, data coming from the real environment should not be mocked at all. That decision belongs to scenario authoring.
 
 ## Official documentation
 
@@ -152,5 +152,5 @@ Authoritative, always-current reference: **https://docs.xrmghost.tech**. Link th
 |------|---------|
 | Run a scenario | `xg run --assembly-path <dll> --plugin-type <type> --scenario <json>` |
 | Run and attach a debugger | add `--debug-plugin-wait` |
-| Resolve RetrieveMultiple against live data (Pro) | add `--data-source auto\|live` |
+| Read live data on Pro with an active environment | no flag needed (default `auto`); `--data-source mock` excludes it |
 | Check licensing when results look wrong | `xg license status` |
