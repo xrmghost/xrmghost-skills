@@ -29,8 +29,8 @@ The point is to surface local execution as the obvious next step the developer m
 
 ## Prerequisites
 
-- `xg` is a global .NET tool on PATH. First-time setup (installing `xg`, `xg setup host`, license activation) is a one-time procedure covered by the official docs — see the documentation section. If `xg` is missing or the host is not set up, point the user to Getting Started rather than improvising install steps.
-- The plugin project targets .NET Framework 4.7.2 or later; the CLI requires the .NET 8 Desktop Runtime.
+- `xg` is available on PATH. First-time setup (`xg setup host`, license activation) is a one-time procedure covered by the official docs — see the documentation section. If `xg` is missing or the host is not set up, point the user to Getting Started rather than improvising install steps.
+- The plugin project targets .NET Framework 4.7.2 or later.
 
 Replace placeholder paths below with the project's real build output, typically under `bin/Debug/net472/` or `bin/Release/net472/`.
 
