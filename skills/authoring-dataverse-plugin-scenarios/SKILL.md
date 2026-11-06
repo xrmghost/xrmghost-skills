@@ -53,14 +53,13 @@ Authoring failure scenarios is a *discovery* tool: forcing yourself to ask "what
 
 Inside any `attributes` object, value typing must be explicit or the framework misreads it. This is the single most common source of authoring errors:
 
-| Type | Write it as | Notes |
-|------|-------------|-------|
-| Plain value (string, number, bool) | `"name": "Contoso Ltd"`, `"numberofemployees": 250`, `"donotemail": true` | A bare number arrives as a plain number, never as `Money` (`100` in `Target.attributes` was observed as `System.Int32`). |
-| OptionSet / Picklist | `{ "value": X }` | Never the bare number. |
-| EntityReference / lookup | `{ "logicalName": "...", "id": "...", "name": "..." }` | `name` optional. GUIDs must be valid hex — IDs with non-hex characters fail to parse. Use real GUIDs for test records. |
-| Money | **No working form — known limit** | Probed with released `xg` (CLI 1.7.5, host 1.0.2) in `Target.attributes`, `retrieveResponses`, root-level `entities` and `preEntityImages`: no context delivered a `Microsoft.Xrm.Sdk.Money`. `{ "value": 100 }` arrives as an `OptionSetValue` in all four; `{ "value": 100.50 }` and `{ "value": 100.0 }` are rejected while the scenario is parsed (`Target.attributes`, `retrieveResponses`), fail the run with a `System.FormatException` (`preEntityImages`), or silently drop the record (root-level `entities`). |
+- **Plain values** (string, number, bool): written directly — `"name": "Contoso Ltd"`, `"revenue": 1000000`.
+- **OptionSet / Picklist**: `{ "value": X }` — never the bare number. The discriminator may also be written explicitly as `{ "type": "OptionSetValue", "value": X }`; both forms mean OptionSetValue, and the untagged `{ "value": X }` stays OptionSetValue.
+- **Money / currency**: `{ "type": "Money", "value": X }` — the `type` tag is what makes it Money; without it the object is read as an OptionSetValue.
+- **EntityReference / lookup**: `{ "logicalName": "...", "id": "...", "name": "..." }` (`name` optional).
+- **GUIDs must be valid hex.** IDs with non-hex characters fail to parse inside EntityReference objects. Use real GUIDs for test records.
 
-**Money is not supported by scenarios today.** Do not write `{ "value": N }` — or any other shape — expecting the plugin to read a `Money`: the probe above found none, in any of the four contexts. A plugin path that reads a Money attribute cannot be driven green by a scenario yet; say so to the user instead of inventing a form, and keep the Money-reading logic covered by a pure-logic unit test until the follow-up bug on XrmGhost Core is fixed.
+> **Requires XrmGhost 1.7.6 or later.** The tagged Money form, the explicit OptionSetValue tag, and every Retrieve behavior described under *Supplying data the code reads* (Retrieve reading the `entities` seed, precedence of in-run mutations, ColumnSet projection, the Dataverse fault instead of `KeyNotFoundException`, a malformed seed failing the run) apply from **1.7.6**. Check the installed version with `xg --version`, or bring the host up to date with `xg setup host --update`. On earlier versions `{ "type": "Money", "value": X }` is read as an OptionSetValue, and Retrieve does not see `entities`.
 
 ## Describing the expected outcome
 
@@ -71,7 +70,7 @@ What you expect when the operation runs:
 
 ### How `expectedException` is matched
 
-- **`typeName` is required.** It is the **fully qualified** type name — namespace included — and it is compared **exactly**: a simple name such as `InvalidPluginExecutionException` does not match, and neither does a derived type that would be assignable to the declared one. An empty `typeName` is not a wildcard: it matches nothing, so a scenario that leaves it empty can never pass.
+- **`typeName` is required.** It is the **fully qualified** type name — namespace included — and it is compared **exactly** (case-sensitive), so copy it verbatim — see *When the record is not there* for the full name of the Dataverse fault. A simple name such as `InvalidPluginExecutionException` does not match, and neither does a derived type that would be assignable to the declared one. An empty `typeName` is not a wildcard: it matches nothing, so a scenario that leaves it empty can never pass.
 - **The comparison is applied to every link of the exception chain**, walked from the outermost exception inward through each `InnerException`. One link satisfying the expectation is enough.
 - **`messageContains` is optional.** When present it is a substring of the exception message, and it is checked on the **same link that satisfied the type** — not on another link, and not on the chain as a whole. Omit it when the type alone is what you mean to assert.
 
@@ -112,11 +111,14 @@ Dropping `messageContains` asserts the rejection type and nothing about its word
 
 ## Supplying data the code reads
 
-When the code reads other records while it runs, describe that data. There are two distinct mechanisms — using the wrong one is the second most common mistake.
+When the code reads other records while it runs, describe that data. There are two distinct mechanisms, with **different attribute shapes** — mixing up the shapes is the second most common mistake:
 
-### `Retrieve` (single record) → `organizationServiceMock.retrieveResponses`
+- `organizationServiceMock.retrieveResponses` — the explicit answer to a `Retrieve`; attributes **nested** under `attributes`.
+- Root-level `entities` — the seed of records the run starts with; attributes **flat** on the entity object. `RetrieveMultiple` queries it, and from 1.7.6 `Retrieve` reads it too.
 
-Each entry matches one `Service.Retrieve(entityName, id, ...)` call. Attributes are **nested** under an `attributes` object.
+### `Retrieve` (single record) → `organizationServiceMock.retrieveResponses` or the `entities` seed
+
+Each `retrieveResponses` entry matches one `Service.Retrieve(entityName, id, ...)` call. Attributes are **nested** under an `attributes` object.
 
 ```json
 "organizationServiceMock": {
@@ -132,6 +134,8 @@ Each entry matches one `Service.Retrieve(entityName, id, ...)` call. Attributes 
   ]
 }
 ```
+
+A record that is not in `retrieveResponses` can be supplied through the root-level `entities` seed instead (shape below): `Retrieve` finds it there by logical name and id. The two structures can coexist in the same scenario — `retrieveResponses` stays the explicit answer for a given Retrieve, `entities` the data both Retrieve and RetrieveMultiple can read.
 
 ### `RetrieveMultiple` (query) → root-level `entities`
 
@@ -153,10 +157,42 @@ Rules for `entities`:
 - Root-level — sibling of `executionContext`, never nested inside it.
 - `logicalName` and `id` at the root of each entity object; attributes flat on the object.
 - Include every field the query's filter references, or the record gets filtered out.
-- OptionSet → `{ "value": X }`; EntityReference → `{ "logicalName": "...", "id": "..." }`.
+- OptionSet → `{ "value": X }` (or `{ "type": "OptionSetValue", "value": X }`); Money → `{ "type": "Money", "value": X }`; EntityReference → `{ "logicalName": "...", "id": "..." }`.
 - The CLI applies the QueryExpression itself (logical name, `Equal`/`In` filters, column set, ordering) and returns only matches.
+- `Retrieve` reads the same records (1.7.6+), by logical name and id.
+- A malformed seed entity **fails the run**: the run stops with a message naming `EntitiesJson`, the entity's logical name, its index in the list and, when known, the attribute that could not be converted — it does not continue with zero entities. Fix the named entry rather than looking for the problem in the code.
 
-> Do **not** use the legacy `retrieveMultipleResponses` format (attributes nested inside a `response.entities` array). Use the root-level `entities` structure above. A single scenario may combine `entities` (for RetrieveMultiple) and `retrieveResponses` (for Retrieve).
+> Do **not** use the legacy `retrieveMultipleResponses` format (attributes nested inside a `response.entities` array). Use the root-level `entities` structure above. A single scenario may combine `entities` and `retrieveResponses`.
+
+### Which source a `Retrieve` sees (precedence)
+
+When more than one source holds the same record (logical name + id), `Retrieve` answers from the first one that has it, in this order:
+
+1. **In-run mutations** — what the code itself did earlier in the same run. After an `Update`, the next `Retrieve` of that record sees the updated values; after a `Delete`, the next `Retrieve` of that record is not-found (the fault below), even if `retrieveResponses` or `entities` still describe it.
+2. **`retrieveResponses`** — the explicit answer.
+3. **`entities`** seed.
+
+This consistency covers the next `Retrieve` in the same run only; do not rely on `Update`/`Delete` being reflected anywhere else.
+
+### Which columns a `Retrieve` returns (ColumnSet)
+
+`Retrieve` projects the record onto the `ColumnSet` the code passes, whichever source the record came from:
+
+- **Columns required** (`new ColumnSet("name", "telephone1")`) — only those attributes, the ones the source has.
+- **Empty** (`new ColumnSet()`) — no attributes besides the primary key.
+- **AllColumns** (`new ColumnSet(true)`) — every attribute the source has.
+
+The primary key is always returned. Mock every column the code requests, or it will be absent from the returned entity.
+
+### When the record is not there
+
+A `Retrieve` of a record no source has — or with `Guid.Empty` as id, or after a `Delete` in the same run — raises the Dataverse fault, as Dataverse does: `FaultException<OrganizationServiceFault>` with ErrorCode `0x80040217` (object does not exist). It is **not** a `KeyNotFoundException`. To author a failure path on it, declare exactly:
+
+```json
+"expectedException": {
+  "typeName": "System.ServiceModel.FaultException`1[[Microsoft.Xrm.Sdk.OrganizationServiceFault, Microsoft.Xrm.Sdk, Version=9.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35]]"
+}
+```
 
 ## Pre-entity images (PreImage)
 
@@ -292,20 +328,20 @@ Backing data (`retrieveResponses`, `entities`) works exactly as above — a Cust
 
 ## How the data source affects what you mock
 
-Before mocking backing data, know which data source the run will use (set by `--data-source` at run time):
+Before mocking backing data, know which data source the run will use (set by `--data-source` at run time; the flag is omitted by default, which means `auto`):
 
-- `mock` (default): every record a query or retrieve needs must be in the scenario.
-- `auto` (Pro): mock only what you want to pin or override; the rest is read live.
-- `live` (Pro): backing data in the scenario is ignored — keep the scenario focused on `Target`, input parameters, and expected outcome.
+- `auto` (default): on Standard, or on Pro with no active environment, Dataverse is never contacted and this behaves exactly like `mock` — every record a query or retrieve needs must be in the scenario. On Pro with an active environment, `Retrieve` reads live first and falls back to the scenario mock only when the record does not exist in Dataverse (for example, one the run itself creates) or live is unavailable or fails, with a warning; any other Dataverse fault reaches the plugin unchanged. `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` go live and never fall back to mocks after a live attempt that fails — the result is then an empty collection with a warning, never mock rows — while a fault Dataverse actually returns reaches the plugin.
+- `mock`: every record a query or retrieve needs must be in the scenario; Dataverse is never contacted.
+- `live` (Pro): backing data in the scenario is ignored entirely — mocks are never read. Dataverse is only read, never written. `Retrieve` without a Pro license, without an active environment, or when live is unavailable or fails raises an exception (with a warning); any Dataverse fault — including a missing record — reaches the plugin. `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` return an empty collection with a warning in those same conditions, and a Dataverse fault reaches the plugin.
 
-If the run will be live or auto, **do not mock data that will come from the real environment** — those mocks are dead weight and can mislead. Decide this before writing the backing data.
+On Pro with an active environment, under `auto` or `live`, **do not mock data that will come from the real environment** — those mocks are dead weight and can mislead, except the `Retrieve` fallback described above. Decide this before writing the backing data. For reproduction, CI, or any scenario shared between people, use `--data-source mock` explicitly — it is deterministic, where `auto` depends on whatever environment happens to be active. Under `auto` and `live`, any Dataverse access is read-only — the run never writes data back to the environment.
 
 ## Best practices
 
 - One scenario per operation; name files by intent (`EnrichContact_HappyPath`, `ValidateContact_MissingParent`).
 - Mock only what the code actually reads for that scenario.
 - Valid hex GUIDs everywhere.
-- Right mechanism: `retrieveResponses` (attributes nested) for Retrieve; root-level `entities` (attributes flat) for RetrieveMultiple.
+- Right shape: `retrieveResponses` (attributes nested) is the explicit answer for Retrieve; root-level `entities` (attributes flat) feeds RetrieveMultiple and, from 1.7.6, Retrieve.
 
 ## Official documentation
 

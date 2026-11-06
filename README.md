@@ -98,6 +98,15 @@ cp -r skills/authoring-dataverse-plugin-scenarios ~/.claude/skills/
 
 Copy the whole skill folder, including its `references/` subdirectory — supporting files are loaded relative to `SKILL.md`. Do not nest a skill one level too deep: the layout must be `…/skills/<skill-name>/SKILL.md`.
 
+### Claude Code plugin marketplace
+
+This repository is also a self-hosted [Claude Code plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces) (`.claude-plugin/marketplace.json`), so Claude Code users can install both skills as one plugin instead of copying files:
+
+```bash
+claude plugin marketplace add xrmghost/xrmghost-skills
+claude plugin install xrmghost@xrmghost
+```
+
 ## Prerequisites
 
 The skills assume the `xg` CLI is installed and set up. First-time setup — installing `xg`, `xg setup host`, and license activation — is covered by the [official Getting Started](https://docs.xrmghost.tech/getting-started/).

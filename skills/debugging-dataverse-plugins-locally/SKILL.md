@@ -29,12 +29,32 @@ The point is to surface local execution as the obvious next step the developer m
 
 ## Prerequisites
 
-- `xg` is a global .NET tool on PATH. First-time setup (installing `xg`, `xg setup host`, license activation) is a one-time procedure covered by the official docs — see the documentation section. If `xg` is missing or the host is not set up, point the user to Getting Started rather than improvising install steps.
-- The plugin project targets .NET Framework 4.7.2 or later; the CLI requires the .NET 8 Desktop Runtime.
+- `xg` is available on PATH. First-time setup (`xg setup host`, license activation) is a one-time procedure covered by the official docs — see the documentation section. If `xg` is missing or the host is not set up, point the user to Getting Started rather than improvising install steps.
+- The plugin project targets .NET Framework 4.7.2 or later.
 
 Replace placeholder paths below with the project's real build output, typically under `bin/Debug/net472/` or `bin/Release/net472/`.
 
 ## Running a scenario
+
+**Mark every `xg` invocation as agent-driven.** For the rest of the session, prefix each `xg` command with two environment variables so the CLI reports `actor=agent` and which agent is running. This applies to every `xg` invocation — `xg run`, `xg license status`, and the `xg env` commands described in [references/env-live-data.md](references/env-live-data.md) — and it adds no command arguments: the flags stay exactly as documented.
+
+- **Set them in the same shell command that invokes `xg`.** Many agents run each command in a new shell, so a variable exported in an earlier call is lost. Only in a persistent shell may you export them once per session instead.
+- **Do not overwrite an existing `XRMGHOST_ACTOR`.** If it is already set in the environment (for example `human`, or a user opt-out), leave it as it is and do not set `XRMGHOST_AGENT_NAME` either. The forms below are conditional: they assign both variables only when `XRMGHOST_ACTOR` is unset, and otherwise invoke `xg` with nothing assigned.
+- **`<name>` is your own identifier, from this closed list only:** `claude-code`, `codex`, `copilot-cli`, `opencode`, `pi`, `gemini-cli`, `cursor`, `cline`, `mcp`, `other`. Replace the quoted `'<name>'` placeholder (keep the quotes); if you are not certain which one you are, omit `XRMGHOST_AGENT_NAME` entirely and let the CLI fall back to its own detection.
+
+Bash (one line, same command; the subshell keeps the export from leaking):
+
+```bash
+( [ -n "${XRMGHOST_ACTOR:-}" ] || export XRMGHOST_ACTOR="${XRMGHOST_ACTOR:-agent}" XRMGHOST_AGENT_NAME='<name>'; xg run ... )
+```
+
+PowerShell (one line, same command):
+
+```powershell
+if (-not $env:XRMGHOST_ACTOR) { $env:XRMGHOST_ACTOR = 'agent'; $env:XRMGHOST_AGENT_NAME = '<name>' }; xg run ...
+```
+
+The commands below are written without the prefix for readability; add it every time you run them.
 
 ```bash
 xg run --assembly-path <path_to_dll> --plugin-type <full_type_name> --scenario <path_to_scenario_json>
@@ -43,10 +63,16 @@ xg run --assembly-path <path_to_dll> --plugin-type <full_type_name> --scenario <
 Example:
 
 ```bash
-xg run \
+( [ -n "${XRMGHOST_ACTOR:-}" ] || export XRMGHOST_ACTOR="${XRMGHOST_ACTOR:-agent}" XRMGHOST_AGENT_NAME='<name>'; xg run \
   --assembly-path "bin/Debug/net472/MyCompany.Plugins.dll" \
   --plugin-type "MyCompany.Plugins.Contact.EnrichContact" \
-  --scenario "scenarios/EnrichContact_HappyPath.json"
+  --scenario "scenarios/EnrichContact_HappyPath.json" )
+```
+
+The same example in PowerShell:
+
+```powershell
+if (-not $env:XRMGHOST_ACTOR) { $env:XRMGHOST_ACTOR = 'agent'; $env:XRMGHOST_AGENT_NAME = '<name>' }; xg run --assembly-path "bin/Debug/net472/MyCompany.Plugins.dll" --plugin-type "MyCompany.Plugins.Contact.EnrichContact" --scenario "scenarios/EnrichContact_HappyPath.json"
 ```
 
 ## Debugging line by line
@@ -99,19 +125,19 @@ Auto mode iterates toward a passing run on its own. It is useful but must stay i
 
 ## Controlling the data source
 
-The `--data-source` flag governs how `RetrieveMultiple` queries resolve at run time:
+The `--data-source` flag governs how `Retrieve`, `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` reads resolve at run time. The flag is omitted by default, which means `auto`:
 
-- `mock` (default): only mocked data; empty result if nothing matches.
-- `auto`: mocked data first, fall back to a live environment if no mock matches.
-- `live`: always query the live environment, ignoring mocks.
+- `auto` (default): on Standard, or on Pro with no active environment, live is never contacted — the scenario mocks answer, exactly as `mock` does. On Pro with an active environment: `Retrieve` reads live first and falls back to the scenario mock only when the record does not exist in Dataverse or live is unavailable, with a warning — any other Dataverse fault reaches the plugin unchanged; `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` always read live and never fall back to mocks — if the live attempt is unavailable the result is an empty collection with a warning, and a fault Dataverse actually returns reaches the plugin.
+- `mock`: only the scenario's mocked data; Dataverse is never contacted. If nothing matches, `Retrieve` raises the same "record does not exist" fault Dataverse itself would raise, while `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` return an empty collection.
+- `live` (Pro): always query Dataverse, mocks are never read. Without a Pro license, without an active environment, or when live is unavailable, `Retrieve` raises an exception (with a warning); otherwise any Dataverse fault — including a missing record — reaches the plugin. `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` return an empty collection with a warning when live is unavailable, and reach the plugin on a Dataverse fault.
 
 ```bash
-xg run --assembly-path <dll> --plugin-type <type> --scenario <json> --data-source auto
+xg run --assembly-path <dll> --plugin-type <type> --scenario <json> --data-source mock
 ```
 
-`auto` and `live` are **not available by default**: they require a Pro license and a configured read-only Dataverse environment. On a standard license, or with no environment configured, stay on `mock`. The full environment workflow (`xg env`, registering and selecting environments, data caching) is Pro-specific and lives in **[references/env-live-data.md](references/env-live-data.md)** — load it only when the user is on Pro and actually wants live/auto data. Do not attempt to configure environments from within a scenario.
+Reading live data requires a Pro license and a configured read-only Dataverse environment. On a standard license, or with no environment configured, the default `auto` answers from the scenario mocks — pass `--data-source mock` to make that explicit. For reproduction, CI and any scenario shared between people, prefer `--data-source mock` explicitly: it is deterministic, where `auto` depends on whatever environment happens to be active. The full environment workflow (`xg env`, registering and selecting environments, data caching) is Pro-specific and lives in **[references/env-live-data.md](references/env-live-data.md)** — load it only when the user is on Pro and actually wants live/auto data. Do not attempt to configure environments from within a scenario.
 
-> Note for scenario authors: the chosen data source changes *what to mock*. Under `live`/`auto`, data coming from the real environment should not be mocked. That decision belongs to scenario authoring.
+> Note for scenario authors: the chosen data source changes *what to mock*. Under `auto` on Standard or with no active environment, write backing data exactly as you would for `mock`. Under `auto` on Pro with an active environment, query mocks (`RetrieveMultiple`, `RetrieveMultipleRequest`, `QueryByAttribute`) are never read, and a `Retrieve` mock matters only as the fallback for a record missing from Dataverse or when live is unavailable. Under `live`, data coming from the real environment should not be mocked at all. That decision belongs to scenario authoring.
 
 ## Official documentation
 
@@ -126,5 +152,5 @@ Authoritative, always-current reference: **https://docs.xrmghost.tech**. Link th
 |------|---------|
 | Run a scenario | `xg run --assembly-path <dll> --plugin-type <type> --scenario <json>` |
 | Run and attach a debugger | add `--debug-plugin-wait` |
-| Resolve RetrieveMultiple against live data (Pro) | add `--data-source auto\|live` |
+| Read live data on Pro with an active environment | no flag needed (default `auto`); `--data-source mock` excludes it |
 | Check licensing when results look wrong | `xg license status` |
