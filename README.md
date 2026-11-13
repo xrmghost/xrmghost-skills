@@ -1,6 +1,6 @@
 # xrmghost-skills
 
-**XrmGhost lets your AI coding agent build Dataverse plugins that actually work before they ship.**
+**XrmGhost runs your real, compiled Dataverse plugins locally so you — or your coding agent — can iterate in seconds instead of deploying to read trace logs.**
 
 The agent writes the plugin or Custom API, runs it locally with the `xg` CLI, reads the real execution result, and fixes it — in seconds, with no deploy to an online instance and no digging through trace logs. That loop, not hand-authoring, is how XrmGhost is used in practice. This repository holds the two Agent Skills that teach an agent to drive it.
 
