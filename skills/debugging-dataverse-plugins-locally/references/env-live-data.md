@@ -9,7 +9,15 @@ Without an active environment, the default `auto` (like `mock`) resolves `Retrie
 - `auto` (default) — live-first. `Retrieve` reads live and falls back to the scenario mock only when the record does not exist in Dataverse or live is unavailable, with a warning; any other Dataverse fault reaches the plugin unchanged. `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` always read live and never fall back to mocks: if the live attempt is unavailable the result is an empty collection with a warning, and a fault Dataverse actually returns reaches the plugin.
 - `live` — ignore mocks entirely. Without a Pro license, without an active environment, or when live is unavailable, `Retrieve` raises an exception (with a warning); otherwise any Dataverse fault — including a missing record — reaches the plugin. `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` return an empty collection with a warning when live is unavailable, and reach the plugin on a Dataverse fault.
 
-Access is **read-only**: XrmGhost reads from the environment to satisfy queries during a local run; it does not write back.
+## Live operations are read-only
+
+Access to the live organization is **read-only**: XrmGhost reads from the environment to satisfy queries during a local run and never writes to it.
+
+- **Approved live operations.** At the request level only `Retrieve`, `RetrieveMultiple`, and `WhoAmI` reach live Dataverse. `RetrieveMultipleRequest` and `QueryByAttribute` are the documented query forms routed through the `RetrieveMultiple` live path.
+- **Everything else is rejected.** Any non-read request is rejected before any network access and fails the run. The diagnostic starts with `Live connection is read-only:`.
+- **Plugin writes stay simulated.** Plugin `Create`, `Update`, and `Delete` calls are simulated inside the local run. They are not writes to the organization, and scenarios that exercise them remain valid under `auto` and `live`.
+
+When a run fails with `Live connection is read-only:`, classify it as a plugin/code defect: the code issues a non-read request through the live connection. Report it and stop. Never bypass the block by writing to the live organization through the Web API, `pac`, a separate SDK client, or scripts. The prohibition covers writes to the live organization only, not simulated plugin writes.
 
 ## The `xg env` command group
 
