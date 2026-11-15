@@ -33,12 +33,12 @@ For the exact subcommands, flags, and authentication options, consult the CLI Re
 
 ## Delegated authentication and the reusable session
 
-Live access runs as the **delegated identity of the environment's owner**: the person who registered the environment signs in once, and the CLI reuses that session on later runs. The session is kept **per environment and account**; nothing is shared with other environments.
+Live access runs as the **delegated identity of the environment's owner**: the person who registered the environment signs in once, and the CLI reuses that session on later runs. The session is kept **per tenant and organisation**: environments for different organisations never share it, while two aliases of the same organisation in the same tenant can.
 
-> Delegated authentication is available from the first CLI release that includes delegated authentication.
+> Delegated authentication is available from the next stable XrmGhost release onwards.
 
-- **Initial sign-in (owner only).** The owner signs in once, in an interactive terminal, through `xg env add` or `xg env edit <name>` (the wizard), or through an interactive `xg run`.
-- **Reuse.** Later runs, including headless ones, reuse the cached session silently for that environment and account. Under `auto` or `live` no prompt is needed while the session is valid.
+- **Initial sign-in (owner only).** The owner registers the environment with `xg env add` (the wizard stores the method, it does not sign in), then signs in once in their own interactive terminal: `xg env activate <name>`, then `xg env refresh` (no name: it acts on the active environment).
+- **Reuse.** Later runs, including headless ones, reuse the cached session silently for that environment. Under `auto` or `live` no prompt is needed while the session is valid.
 - **Sign-out.** `xg env logout [FRIENDLY_NAME]` removes the cached session of the named environment (the active one when no name is given). If the sign-in cache is shared with another environment it is not deleted, and the command says so.
 - **Supported methods** (chosen in the `xg env add` / `xg env edit` wizard):
   - interactive browser sign-in with MFA (on Windows through WAM, the Windows account broker);
@@ -51,11 +51,11 @@ Live access runs as the **delegated identity of the environment's owner**: the p
 
 ### Rules for agents (headless)
 
-An agent runs headless: no terminal, no prompt.
+An agent never gets a sign-in prompt, even when it runs `xg` in a terminal of its own (an editor's integrated terminal): the CLI recognises agent and CI runs and fails fast instead of opening a browser, WAM or device code.
 
 - **Never** start a sign-in or prompt, and **never** run `xg env logout`, `xg env edit` or `xg env add`: they are the owner's actions. Do not configure the environment from the agent's process either.
-- When the session is missing or expired, `xg run` fails with a re-authentication message. Report that message **as the CLI printed it**; do not paraphrase it or invent one. At the time of writing the CLI says: `Environment '<name>' needs an interactive sign-in, which is not allowed here (no terminal, or --no-interactive). Run 'xg env refresh' in a terminal to sign in, then run this command again.` or, for other token failures, `Could not get a token for environment '<name>'. Run 'xg env refresh' in a terminal to sign in again, then run this command again.`
-- Then stop and ask the owner to **re-authenticate** in an interactive terminal: run `xg env edit <name>` or an interactive `xg run`, then tell the agent to retry. Meanwhile `--data-source mock` keeps the run deterministic and needs no session.
+- When the session is missing or expired, `xg run` fails with a re-authentication message. Report that message **as the CLI printed it**; do not paraphrase it or invent one. At the time of writing the CLI says: `Environment '<name>' needs an interactive sign-in, which is not allowed here (no terminal, --no-interactive, or a command started by an agent or CI). Run 'xg env activate <name>' and then 'xg env refresh' in your own terminal to sign in, then run this command again.` or, for other token failures, `Could not get a token for environment '<name>'. Run 'xg env activate <name>' and then 'xg env refresh' in your own terminal to sign in again, then run this command again.` For Azure CLI the message names the `az login --tenant <tenant>` the owner has to run.
+- Then stop and ask the owner to **re-authenticate** in their own interactive terminal: run `xg env activate <name>`, then `xg env refresh` (for Azure CLI, the `az login` the message names), then tell the agent to retry. `xg env edit` does not sign in. Meanwhile `--data-source mock` keeps the run deterministic and needs no session.
 - The read-only guarantee above is unchanged by delegated identity: only `Retrieve`, `RetrieveMultiple` and `WhoAmI` reach Dataverse.
 
 ## Data caching
