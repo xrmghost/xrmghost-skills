@@ -31,6 +31,33 @@ Environments are managed through `xg env`. The typical lifecycle:
 
 For the exact subcommands, flags, and authentication options, consult the CLI Reference for `xg env` at https://docs.xrmghost.tech/cli/reference/ — these are environment- and version-specific and the docs are the source of truth.
 
+## Delegated authentication and the reusable session
+
+Live access runs as the **delegated identity of the environment's owner**: the person who registered the environment signs in once, and the CLI reuses that session on later runs. The session is kept **per environment and account**; nothing is shared with other environments.
+
+> Delegated authentication is available from the first CLI release that includes delegated authentication.
+
+- **Initial sign-in (owner only).** The owner signs in once, in an interactive terminal, through `xg env add` or `xg env edit <name>` (the wizard), or through an interactive `xg run`.
+- **Reuse.** Later runs, including headless ones, reuse the cached session silently for that environment and account. Under `auto` or `live` no prompt is needed while the session is valid.
+- **Sign-out.** `xg env logout [FRIENDLY_NAME]` removes the cached session of the named environment (the active one when no name is given). If the sign-in cache is shared with another environment it is not deleted, and the command says so.
+- **Supported methods** (chosen in the `xg env add` / `xg env edit` wizard):
+  - interactive browser sign-in with MFA (on Windows through WAM, the Windows account broker);
+  - device code;
+  - certificate (app registration, ClientId required);
+  - client secret (app registration, ClientId required);
+  - Azure CLI (reuses `az login`).
+- **Persistence limit on Linux.** Without `libsecret` the cache is not persistent: the session stays in memory and no refresh token is written to disk, so every new process needs a non-interactive method (certificate, client secret, Azure CLI) or a fresh interactive sign-in.
+- **Unverified XrmGhost app.** If the tenant blocks consent for the multitenant XrmGhost app (its publisher is not verified), the owner registers the environment with the **ClientId of the customer's own app registration** (the "my own app registration" choices for browser and device code). Never write a ClientId, token, password or secret into skills, scenarios or chat.
+
+### Rules for agents (headless)
+
+An agent runs headless: no terminal, no prompt.
+
+- **Never** start a sign-in or prompt, and **never** run `xg env logout`, `xg env edit` or `xg env add`: they are the owner's actions. Do not configure the environment from the agent's process either.
+- When the session is missing or expired, `xg run` fails with a re-authentication message. Report that message **as the CLI printed it**; do not paraphrase it or invent one. At the time of writing the CLI says: `Environment '<name>' needs an interactive sign-in, which is not allowed here (no terminal, or --no-interactive). Run 'xg env refresh' in a terminal to sign in, then run this command again.` or, for other token failures, `Could not get a token for environment '<name>'. Run 'xg env refresh' in a terminal to sign in again, then run this command again.`
+- Then stop and ask the owner to **re-authenticate** in an interactive terminal: run `xg env edit <name>` or an interactive `xg run`, then tell the agent to retry. Meanwhile `--data-source mock` keeps the run deterministic and needs no session.
+- The read-only guarantee above is unchanged by delegated identity: only `Retrieve`, `RetrieveMultiple` and `WhoAmI` reach Dataverse.
+
 ## Data caching
 
 To avoid hitting the live environment repeatedly for the same reads across runs, retrieved data can be cached locally. This speeds up the iterate-and-rerun loop and reduces load on the environment. Cache behavior and controls are documented in the CLI Reference.
