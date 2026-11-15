@@ -9,7 +9,16 @@ Without an active environment, the default `auto` (like `mock`) resolves `Retrie
 - `auto` (default) — live-first. `Retrieve` reads live and falls back to the scenario mock only when the record does not exist in Dataverse or live is unavailable, with a warning; any other Dataverse fault reaches the plugin unchanged. `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` always read live and never fall back to mocks: if the live attempt is unavailable the result is an empty collection with a warning, and a fault Dataverse actually returns reaches the plugin.
 - `live` — ignore mocks entirely. Without a Pro license, without an active environment, or when live is unavailable, `Retrieve` raises an exception (with a warning); otherwise any Dataverse fault — including a missing record — reaches the plugin. `RetrieveMultiple`, `RetrieveMultipleRequest` and `QueryByAttribute` return an empty collection with a warning when live is unavailable, and reach the plugin on a Dataverse fault.
 
-Access is **read-only**: XrmGhost reads from the environment to satisfy queries during a local run; it does not write back.
+## Live operations are read-only
+
+Access to the live organization is **read-only**: XrmGhost reads from the environment to satisfy queries during a local run and never writes to it.
+
+- **Approved live operations.** At the request level only `Retrieve`, `RetrieveMultiple`, and `WhoAmI` reach live Dataverse. `RetrieveMultipleRequest` and `QueryByAttribute` are the documented query forms routed through the `RetrieveMultiple` live path.
+- **Everything else is rejected.** Any non-read request is rejected before any network access and fails the run with `Live connection is read-only: '<operation>' is not allowed (only Retrieve, RetrieveMultiple and WhoAmI reach Dataverse).`, where `<operation>` names the refused operation (for example `Create`, or `Execute:<request>`).
+- **Plugin writes stay simulated.** Plugin writes always go to the simulated run service inside the local run, and the run sends only `Retrieve`, `RetrieveMultiple` and `WhoAmI` to the live connection. They are not writes to the organization, and scenarios that exercise them remain valid under `auto` and `live`. The read-only block is a second guarantee on top of that.
+- **Availability.** The block is available from the next stable XrmGhost release onwards.
+
+When a run fails with `Live connection is read-only:`, treat it as a possible XrmGhost bug, not a defect in the user's plugin: a plugin cannot reach the live connection with a write. Report the full error to the user as a possible XrmGhost bug (to be filed at https://docs.xrmghost.tech/community/report-a-bug/) and stop. Do not try to work around the block, and do not change the plugin to avoid it. Never bypass the block by writing to the live organization through the Web API, `pac`, a separate SDK client, or scripts. The prohibition covers writes to the live organization only, not simulated plugin writes.
 
 ## The `xg env` command group
 
