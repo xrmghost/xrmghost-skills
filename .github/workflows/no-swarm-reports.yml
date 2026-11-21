@@ -1,0 +1,23 @@
+name: no-swarm-reports
+
+# Swarm reports (docs/swarm/**) are internal process artefacts and must never be
+# committed to a public xrmghost repository.
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if docs/swarm exists
+        run: |
+          if git ls-files --error-unmatch 'docs/swarm/*' >/dev/null 2>&1 || [ -n "$(git ls-files docs/swarm)" ]; then
+            echo "::error::docs/swarm/ must not be committed to a public repository (internal swarm reports)."
+            git ls-files docs/swarm
+            exit 1
+          fi
