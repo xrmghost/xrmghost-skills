@@ -4,3 +4,6 @@ Thumbs.db
 *.swp
 .idea/
 .vscode/
+
+# Internal swarm reports never go into public repos
+docs/swarm/
